@@ -225,7 +225,9 @@ $("join-form").addEventListener("submit", (e) => {
 // own Matrix profile (same origin, so Element Call's login is available).
 async function callDisplayName() {
   try {
-    const s = JSON.parse(localStorage.getItem("matrix-auth-store") || "null");
+    // guard.js keeps Element Call's login in the tab's sessionStorage (shared
+    // with this same-origin iframe), not in localStorage.
+    const s = JSON.parse(sessionStorage.getItem("matrix-auth-store") || "null");
     if (!s?.user_id || !s?.access_token) return "";
     const r = await fetch(`/_matrix/client/v3/profile/${encodeURIComponent(s.user_id)}/displayname`, {
       headers: { Authorization: `Bearer ${s.access_token}` },
