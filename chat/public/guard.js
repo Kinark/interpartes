@@ -54,52 +54,25 @@
   window.addEventListener("hashchange", scrub);
   window.addEventListener("popstate", scrub);
 
-  // Nothing about a visit stays in the browser once it's over: no guest
-  // login, nickname, call passwords, Matrix cache or Element Call's local
-  // debug logs. Wiped when a call ends, when the tab is closed or leaves the
-  // site, and whenever the home page loads. Skipped while another tab is in a
-  // call (it shares the guest login, and deleting its databases would wait
-  // for it to close). Tabs that are not in a call don't block it.
-  const TAB = "ip-tab:" + crypto.randomUUID();
-  const DATABASES = [
-    "matrix-js-sdk:element-call-sync",
-    "matrix-js-sdk::matrix-sdk-crypto",
-    "matrix-js-sdk::matrix-sdk-crypto-meta",
-    "logs-element-call",
-  ];
-  function othersOpen() {
-    const now = Date.now();
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k.startsWith("ip-tab:") && k !== TAB && now - Number(localStorage.getItem(k)) < 5000) return true;
-    }
-    return false;
-  }
-  function forget(keepTab) {
-    // sessionStorage dies with the tab anyway; keeping it on reload lets the
-    // nickname be filled in again.
-    if (!keepTab) sessionStorage.clear();
-    if (othersOpen()) return;
-    localStorage.clear();
-    // Requested before Element Call opens them, so its opens wait for these.
-    for (const name of DATABASES) indexedDB.deleteDatabase(name);
-    indexedDB.databases?.().then((dbs) => {
-      for (const d of dbs) if (d.name) indexedDB.deleteDatabase(d.name);
+  // No session survives a call. Element Call is given no lasting storage:
+  // its "localStorage" is this tab's sessionStorage, and it gets no IndexedDB,
+  // so the Matrix client keeps everything in memory. The guest login, call
+  // passwords and nickname therefore live only in this tab, are never shared
+  // with other tabs, and are wiped when a call ends or the home page loads.
+  // Anything older versions of this page left behind is deleted too.
+  const real = { local: window.localStorage, idb: window.indexedDB };
+  try {
+    real.local.clear();
+    real.idb.databases?.().then((dbs) => {
+      for (const d of dbs) if (d.name) real.idb.deleteDatabase(d.name);
     });
-  }
-  function beat() {
-    try {
-      if (location.pathname.startsWith("/room")) localStorage.setItem(TAB, String(Date.now()));
-      else localStorage.removeItem(TAB);
-    } catch {}
+  } catch {}
+  Object.defineProperty(window, "localStorage", { configurable: true, get: () => sessionStorage });
+  Object.defineProperty(window, "indexedDB", { configurable: true, get: () => undefined });
+  function forget() {
+    sessionStorage.clear();
   }
   if (location.pathname === "/") forget();
-  beat();
-  setInterval(beat, 2000);
-  window.addEventListener("pagehide", () => {
-    localStorage.removeItem(TAB);
-    forget(true);
-  });
 
   // Skip Element Call's "Your call has ended. How did it go?" screen: forget
   // the visit and go straight back to the home page.

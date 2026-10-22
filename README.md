@@ -108,13 +108,13 @@ is not honest.
   rooms forgotten on leave; message retention at most 1 day.
 
 On disk only: config files, the Synapse signing key, `.env` and the TLS cert.
-In the browser: `guard.js` deletes everything this origin stores (localStorage
-with the guest login and `room-shared-key-*` call passwords, sessionStorage with
-the nickname, and Element Call's IndexedDB sync/crypto/log databases) when a
-call ends, when the page unloads, and when the home page loads. It skips the
-wipe while another interpartes tab is open (tabs mark themselves with an
-`ip-tab:*` heartbeat in localStorage). Reloading during a call therefore asks
-you to join as a guest again. Element Call's "Your call has ended / How did it
+In the browser: nothing lasting. `guard.js` (first script, before Element Call)
+replaces `window.localStorage` with the tab's `sessionStorage` and hides
+`window.indexedDB`, so the guest login, `room-shared-key-*` call passwords and
+the Matrix sync/crypto stores live only in memory and in this tab (each tab is
+its own guest). Tab storage is cleared whenever the home page loads, i.e. after
+every call. On load it also deletes any real localStorage/IndexedDB data left
+by earlier versions. Element Call's "Your call has ended / How did it
 go?" screen is never shown: `guard.js` hides it and goes straight to the home
 page.
 
