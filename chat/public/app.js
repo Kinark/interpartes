@@ -33,8 +33,9 @@ function unb64(s) {
   return out;
 }
 
-function randomSecret() {
-  const b = crypto.getRandomValues(new Uint8Array(16));
+// Room secrets are 24 bytes (192 bits, 32 characters); message IDs need only 16.
+function randomSecret(bytes = 24) {
+  const b = crypto.getRandomValues(new Uint8Array(bytes));
   return b64(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
@@ -172,7 +173,7 @@ function peerName(id) {
 
 async function sendObj(obj) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-  ws.send(await seal(keys.key, { ...obj, id: randomSecret(), ts: Date.now() }));
+  ws.send(await seal(keys.key, { ...obj, id: randomSecret(16), ts: Date.now() }));
   return true;
 }
 

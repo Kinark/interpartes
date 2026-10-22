@@ -219,7 +219,7 @@
           return;
         }
       }
-      const secretBytes = crypto.getRandomValues(new Uint8Array(16));
+      const secretBytes = crypto.getRandomValues(new Uint8Array(24));
       const secret = btoa(String.fromCharCode(...secretBytes))
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
