@@ -1,0 +1,278 @@
+:root {
+  color-scheme: dark;
+  --bg: #101317;
+  --panel: #1b1f24;
+  --line: #2c3239;
+  --text: #ebeef2;
+  --muted: #8d97a5;
+  --accent: #0dbd8b;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body.embedded {
+  background: var(--panel);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+header button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+#join {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 16px;
+}
+
+#join-form {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 16px;
+}
+
+#join-form h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+}
+
+#join-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+#chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#chat header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+#chat .heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+#room-title {
+  color: var(--text);
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#room-title:empty {
+  display: none;
+}
+
+#status.ok::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.safety {
+  white-space: nowrap;
+}
+
+#safety {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+}
+
+#chat .heading {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+#log {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#log li {
+  max-width: 85%;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  column-gap: 8px;
+}
+
+#log li.mine {
+  align-self: flex-end;
+  justify-content: end;
+}
+
+#log .who {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+#log .when {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#log .text {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+body.embedded #log .text {
+  background: var(--bg);
+}
+
+#log li.mine .text {
+  background: #0b5d47;
+}
+
+#log li.notice {
+  align-self: center;
+  max-width: 100%;
+  display: block;
+}
+
+#log li.notice .text {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+#send {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+
+body.doc {
+  height: auto;
+  line-height: 1.55;
+}
+
+body.doc main {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+body.doc h2 {
+  margin-top: 32px;
+  font-size: 18px;
+}
+
+body.doc li {
+  margin-bottom: 8px;
+}
+
+body.doc a {
+  color: var(--accent);
+}
+
+body.doc code {
+  font-size: 0.9em;
+  background: var(--panel);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.hint a {
+  color: inherit;
+}
+
+#send textarea {
+  resize: none;
+  max-height: 120px;
+}

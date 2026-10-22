@@ -1,0 +1,5 @@
+.env
+data/
+SSL/
+.DS_Store
+.ruff_cache/

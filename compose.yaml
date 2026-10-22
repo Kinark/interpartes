@@ -1,0 +1,190 @@
+name: interpartes
+x-nolog: &nolog
+  driver: none
+services:
+  interpartes:
+    image: ghcr.io/element-hq/element-call:v0.28.0@sha256:4df838bea8403a8b29db4ff6632ffbd44044b6a4fc32f214b1d348c243dae03d
+    container_name: interpartes
+    logging: *nolog
+    restart: unless-stopped
+    volumes:
+      - ./config/element-call.json:/app/config.json:ro
+      - ./config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./config/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
+      # Upstream index.html + guest-only CSS + guard.js/inject.js tags
+      # (verify/verify.mjs checks this against the release).
+      - ./config/index.html:/app/index.html:ro
+    networks:
+      - caddy
+    labels:
+      caddy: ${DOMAIN}
+      # Cert from ./SSL, stored in the caddy stack data dir
+      caddy.tls: /data/certs/${DOMAIN}/fullchain.pem /data/certs/${DOMAIN}/privkey.pem
+      caddy.handle: ""
+      caddy.handle.reverse_proxy: interpartes:8080
+      # Discard this site's access logs
+      caddy.log.output: discard
+    depends_on:
+      - interpartes-synapse
+
+  interpartes-synapse:
+    image: ghcr.io/element-hq/synapse:latest@sha256:97665cd4539dcf107c69fb6afdb720e1d1c9c09fb2b5701fb13d6c33b22cd8f0
+    container_name: interpartes-synapse
+    logging: *nolog
+    restart: unless-stopped
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      # libpq reads this, so the published homeserver.yaml has no password.
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Only the signing key and secrets/ are used from here; the published
+      # config is mounted over homeserver.yaml.
+      - ./data/synapse:/data
+      - ./config/homeserver.yaml:/data/homeserver.yaml:ro
+      - ./config/synapse.log.config:/data/interpartes.lo.fi.log.config:ro
+    networks:
+      - default
+      - caddy
+    labels:
+      caddy: ${DOMAIN}
+      caddy.@matrix.path: /_matrix/* /_synapse/client/* /.well-known/matrix/*
+      caddy.handle: "@matrix"
+      caddy.handle.reverse_proxy: interpartes-synapse:8008
+    depends_on:
+      interpartes-db:
+        condition: service_healthy
+        restart: true
+
+  interpartes-db:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    container_name: interpartes-db
+    logging: *nolog
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: synapse
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C
+    # In RAM only: nothing reaches disk, a restart wipes everything.
+    tmpfs:
+      - /var/lib/postgresql/data:size=1g,mode=0700,uid=70,gid=70
+    command: [postgres, -c, fsync=off, -c, synchronous_commit=off, -c, full_page_writes=off, -c, log_min_messages=panic, -c, log_min_error_statement=panic]
+    networks:
+      - default
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U synapse]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  interpartes-livekit:
+    image: livekit/livekit-server:v1.13.10@sha256:89ca9ce0791e18d6e03bf6e2c49ceb27e1c754eae8bd50c989386c1a5963791a
+    container_name: interpartes-livekit
+    logging: *nolog
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
+    volumes:
+      - ./config/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      # WebRTC media (must also be open in the cloud firewall)
+      - 7881:7881/tcp
+      - 7882:7882/udp
+    networks:
+      - default
+      - caddy
+    labels:
+      caddy: ${DOMAIN}
+      caddy.handle_path: /livekit/sfu*
+      caddy.handle_path.reverse_proxy: interpartes-livekit:7880
+
+  interpartes-jwt:
+    image: ghcr.io/element-hq/lk-jwt-service:latest@sha256:d210fd778ba38b7e42e6fc64e8a24a7d66ccc3b938fb20d73bd713224af2dfea
+    container_name: interpartes-jwt
+    logging: *nolog
+    restart: unless-stopped
+    environment:
+      LIVEKIT_JWT_BIND: ":8080"
+      LIVEKIT_URL: wss://${DOMAIN}/livekit/sfu
+      LIVEKIT_KEY: ${LIVEKIT_KEY}
+      LIVEKIT_SECRET: ${LIVEKIT_SECRET}
+      LIVEKIT_FULL_ACCESS_HOMESERVERS: ${DOMAIN}
+      # Fallback if a webhook is missed: re-check the SFU every 15 s.
+      LIVEKIT_SANITY_CHECK_INTERVAL_SECONDS: "15"
+    networks:
+      - default
+      - caddy
+    labels:
+      caddy: ${DOMAIN}
+      caddy.handle_path: /livekit/jwt*
+      caddy.handle_path.reverse_proxy: interpartes-jwt:8080
+
+  interpartes-chat:
+    image: denoland/deno:alpine-2.9.7@sha256:8ce780168429c4bf5962652e6cbea3fd45254ae902069e90585fb33f74c56968
+    container_name: interpartes-chat
+    logging: *nolog
+    restart: unless-stopped
+    read_only: true
+    user: "1000"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /deno-dir:size=64m
+    command: [run, --no-prompt, --allow-net=0.0.0.0:8080, --allow-read=/app, /app/server.ts]
+    volumes:
+      - ./chat:/app:ro
+    networks:
+      - caddy
+    labels:
+      caddy: ${DOMAIN}
+      caddy.handle_path: /chat*
+      caddy.handle_path.reverse_proxy: interpartes-chat:8080
+      # Caddy-wide (global options): proxy warnings and handler errors are
+      # logged for every site with the visitor IP and request headers. Log
+      # them without those. This site's access log is discarded (see above).
+      caddy_1: ""
+      caddy_1.log_0: default
+      caddy_1.log_0.exclude: http.handlers.reverse_proxy http.log.error
+      caddy_1.log_1: redacted
+      caddy_1.log_1.include: http.handlers.reverse_proxy http.log.error
+      caddy_1.log_1.format: filter
+      caddy_1.log_1.format.wrap: json
+      caddy_1.log_1.format.request>remote_ip: delete
+      caddy_1.log_1.format.request>remote_port: delete
+      caddy_1.log_1.format.request>client_ip: delete
+      caddy_1.log_1.format.request>headers: delete
+    healthcheck:
+      test: [CMD, deno, eval, "const r = await fetch('http://127.0.0.1:8080/healthz'); Deno.exit(r.ok ? 0 : 1)"]
+      interval: 30s
+
+  interpartes-janitor:
+    image: ghcr.io/element-hq/synapse:latest@sha256:97665cd4539dcf107c69fb6afdb720e1d1c9c09fb2b5701fb13d6c33b22cd8f0
+    container_name: interpartes-janitor
+    logging: *nolog
+    restart: unless-stopped
+    user: "991"
+    entrypoint: [python, -u, /janitor.py]
+    healthcheck:
+      test: [CMD, python, -c, "import os,time,sys;sys.exit(time.time()-os.path.getmtime('/tmp/janitor.ok')>120)"]
+      interval: 30s
+    environment:
+      SERVER_NAME: ${DOMAIN}
+      JANITOR_PASSWORD: ${JANITOR_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/janitor.py:/janitor.py:ro
+      - ./config/homeserver.yaml:/data/homeserver.yaml:ro
+      - ./data/synapse/secrets/registration_shared_secret:/data/secrets/registration_shared_secret:ro
+    networks:
+      - default
+    depends_on:
+      interpartes-synapse:
+        condition: service_healthy
+
+networks:
+  caddy:
+    external: true
+x-dockge:
+  urls:
+    - https://interpartes.lo.fi

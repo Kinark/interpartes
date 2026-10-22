@@ -1,0 +1,103 @@
+server_name: "interpartes.lo.fi"
+public_baseurl: "https://interpartes.lo.fi/"
+pid_file: /data/homeserver.pid
+log_config: "/data/interpartes.lo.fi.log.config"
+media_store_path: /data/media_store
+signing_key_path: "/data/interpartes.lo.fi.signing.key"
+report_stats: false
+# Element Call puts the room creator in power_levels.users, which room
+# v12 (Synapse default since 1.13x) rejects. Keep rooms on v11.
+default_room_version: "11"
+trusted_key_servers: []
+suppress_key_server_warning: true
+
+registration_shared_secret_path: /data/secrets/registration_shared_secret
+macaroon_secret_key_path: /data/secrets/macaroon_secret_key
+form_secret_path: /data/secrets/form_secret
+
+listeners:
+  - port: 8008
+    type: http
+    tls: false
+    # No client IPs: Synapse sees only the proxy address.
+    x_forwarded: false
+    bind_addresses: ["0.0.0.0"]
+    resources:
+      # openid is required by lk-jwt-service to validate users;
+      # federation itself is disabled below.
+      - names: [client, openid]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: synapse
+    dbname: synapse
+    host: interpartes-db
+    cp_min: 5
+    cp_max: 10
+
+# Standalone Element Call: isolated homeserver, no federation.
+federation_domain_whitelist: []
+serve_server_wellknown: true
+
+# Element Call guests register anonymous accounts on the fly.
+enable_registration: true
+enable_registration_without_verification: true
+# IP-based limits are global here (x_forwarded is off, so every
+# client shares the proxy's address).
+rc_registration:
+  per_second: 1
+  burst_count: 30
+
+experimental_features:
+  msc3266_enabled: true
+  msc4143_enabled: true
+  msc4222_enabled: true
+
+max_event_delay_duration: 24h
+
+rc_message:
+  per_second: 0.5
+  burst_count: 30
+
+rc_delayed_event_mgmt:
+  per_second: 1
+  burst_count: 20
+
+matrix_rtc:
+  transports:
+    - type: livekit
+      livekit_service_url: https://interpartes.lo.fi/livekit/jwt
+
+extra_well_known_client_content:
+  org.matrix.msc4143.rtc_foci:
+    - type: livekit
+      livekit_service_url: https://interpartes.lo.fi/livekit/jwt
+
+# --- Privacy: keep as little as possible (janitor removes the rest) ---
+user_ips_max_age: 1m
+redaction_retention_period: 1m
+forgotten_room_retention_period: 1m
+forget_rooms_on_leave: true
+presence:
+  enabled: false
+user_directory:
+  enabled: false
+include_profile_data_on_invite: false
+limit_profile_requests_to_users_who_share_rooms: true
+require_auth_for_profile_requests: true
+allow_public_rooms_without_auth: false
+room_list_publication_rules:
+  - action: deny
+enable_media_repo: false
+url_preview_enabled: false
+enable_metrics: false
+limit_usage_by_mau: false
+mau_stats_only: false
+retention:
+  enabled: true
+  default_policy:
+    max_lifetime: 1d
+  purge_jobs:
+    - interval: 1h

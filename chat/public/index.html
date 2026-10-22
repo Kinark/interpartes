@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>interpartes chat</title>
+    <link rel="stylesheet" href="/chat/style.css" />
+  </head>
+  <body>
+    <section id="join" class="screen" hidden>
+      <form id="join-form">
+        <h1 id="join-title">Start new chat</h1>
+        <label>
+          Display name
+          <input id="name" maxlength="40" autocomplete="off" required />
+        </label>
+        <button id="join-go" type="submit">Start</button>
+        <p class="hint">
+          End-to-end encrypted. Nothing is stored: when the last person leaves, the chat is gone.
+          <a href="/chat/privacy.html">How to check</a>
+        </p>
+      </form>
+    </section>
+
+    <section id="chat" class="screen" hidden>
+      <header>
+        <span class="heading">
+          <strong id="room-title"></strong>
+          <span id="status">Connecting…</span>
+          <span
+            class="safety"
+            title="Safety code: compare it with the others. If everyone sees the same digits, you all share the same encryption key."
+            >Safety code <span id="safety"></span
+          ></span>
+        </span>
+        <span class="actions">
+          <button id="copy" type="button">Copy link</button>
+          <button id="leave" type="button">Leave</button>
+        </span>
+      </header>
+      <ul id="log" aria-live="polite"></ul>
+      <form id="send">
+        <textarea id="text" rows="1" maxlength="4000" placeholder="Message" autocomplete="off"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+
+    <script src="/chat/app.js"></script>
+  </body>
+</html>

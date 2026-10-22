@@ -1,0 +1,17 @@
+port: 7880
+bind_addresses: [""]
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+  node_ip: 157.151.29.39
+room:
+  auto_create: false
+logging:
+  level: info
+# Tells lk-jwt-service when a participant disconnects, so it can send their
+# delegated "left the call" event right away.
+webhook:
+  api_key: interpartes
+  urls:
+    - http://interpartes-jwt:8080/sfu_webhook

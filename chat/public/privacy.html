@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Privacy · interpartes</title>
+    <link rel="stylesheet" href="/chat/style.css" />
+  </head>
+  <body class="doc">
+    <main>
+      <h1>How private is interpartes?</h1>
+
+      <h2>What nobody but the participants can see</h2>
+      <ul>
+        <li>
+          <strong>Call audio, video and screen sharing.</strong> They are end-to-end encrypted in your
+          browser with a key that is part of the call link, after the <code>#</code>. Browsers never
+          send that part of a link to a server, so the server forwards media it cannot decode.
+        </li>
+        <li>
+          <strong>Chat messages.</strong> Encrypted the same way (AES-256-GCM, key derived from the
+          link). The server relays ciphertext, never stores it, and forgets a chat room the moment
+          the last person leaves.
+        </li>
+      </ul>
+
+      <h2>What the server does see, and for how long</h2>
+      <ul>
+        <li>
+          While a call is running: the room name you typed, the nickname of each participant, a
+          random guest account per person, and when each one joined or left. The database lives
+          only in memory. About 30 seconds after a call ends the room and its guest accounts are
+          erased, and a server restart wipes everything.
+        </li>
+        <li>
+          Network: the server necessarily receives connections from your IP address. It keeps no
+          access logs, and the services behind the proxy never see your IP. Error lines that the
+          proxy writes are stripped of IPs and browser details.
+        </li>
+        <li>
+          Chat: an opaque room tag (not the name, not the key), how many people are connected, and
+          the size of messages rounded up to 256 bytes.
+        </li>
+      </ul>
+      <p>No analytics, crash reporting or third-party services: the browser is told (by the
+        <code>Content-Security-Policy</code> header) to refuse connections to any other server.</p>
+
+      <h2>Check it yourself</h2>
+      <ol>
+        <li>
+          <strong>Compare the safety code.</strong> Calls and chats show a 12-digit safety code.
+          Read it out to each other. If everyone sees the same digits, you all hold the same key, so
+          nobody was given a different link and nobody else can listen in.
+        </li>
+        <li>
+          <strong>Check the code your browser receives.</strong> The full setup is public at
+          <a href="https://github.com/Kinark/interpartes">github.com/Kinark/interpartes</a>. Run
+          <code>node verify/verify.mjs</code> from it: it downloads every file this site serves
+          and checks it against the official Element Call release hashes and the repository.
+        </li>
+        <li>
+          <strong>Look for the lock.</strong> A call without a key in its link would not be
+          end-to-end encrypted. interpartes shows a red warning instead of a safety code if that
+          happens, and strips link options that could turn encryption or reporting on.
+        </li>
+      </ol>
+
+      <h2>Limits</h2>
+      <ul>
+        <li>
+          Anyone who has the link can join. Share it only with the people you mean to, over a
+          channel you trust.
+        </li>
+        <li>
+          The verification checks the site at the moment you run it. A server that changed its
+          code for one specific visitor could pass the check for everyone else, which is why the
+          safety code matters: it relies only on your own browsers.
+        </li>
+        <li>
+          Your device and browser have to be trustworthy. Encryption cannot protect a call from
+          malware or extensions on a participant's computer.
+        </li>
+      </ul>
+      <p><a href="/">Back to interpartes</a></p>
+    </main>
+  </body>
+</html>

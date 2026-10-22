@@ -1,0 +1,20 @@
+{
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "https://interpartes.lo.fi",
+      "server_name": "interpartes.lo.fi"
+    }
+  },
+  "ssla": "https://static.element.io/legal/element-software-and-services-license-agreement-uk-1.pdf",
+  "matrix_rtc_mode": "compatibility",
+  "matrix_rtc_session": {
+    "delayed_leave": {
+      "delay_ms": 20000,
+      "restart_ms": 5000
+    },
+    "delegated_delayed_leave": {
+      "delay_ms": 20000,
+      "restart_ms": 5000
+    }
+  }
+}
