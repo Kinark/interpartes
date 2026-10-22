@@ -57,9 +57,9 @@
   // Nothing about a visit stays in the browser once it's over: no guest
   // login, nickname, call passwords, Matrix cache or Element Call's local
   // debug logs. Wiped when a call ends, when the tab is closed or leaves the
-  // site, and whenever the home page loads. Skipped while another interpartes
-  // tab is open (it may be in a call, and deleting its databases would wait
-  // for it to close).
+  // site, and whenever the home page loads. Skipped while another tab is in a
+  // call (it shares the guest login, and deleting its databases would wait
+  // for it to close). Tabs that are not in a call don't block it.
   const TAB = "ip-tab:" + crypto.randomUUID();
   const DATABASES = [
     "matrix-js-sdk:element-call-sync",
@@ -89,7 +89,8 @@
   }
   function beat() {
     try {
-      localStorage.setItem(TAB, String(Date.now()));
+      if (location.pathname.startsWith("/room")) localStorage.setItem(TAB, String(Date.now()));
+      else localStorage.removeItem(TAB);
     } catch {}
   }
   if (location.pathname === "/") forget();

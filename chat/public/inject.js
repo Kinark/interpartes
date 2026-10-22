@@ -139,7 +139,14 @@
     form:has([data-testid=home_go]){display:grid;grid-template-columns:1fr 1fr;
       column-gap:12px;row-gap:24px;width:min(360px,calc(100vw - 32px));align-items:center}
     form:has([data-testid=home_go]) > *{margin:0!important}
-    form:has([data-testid=home_go]) > div:has([data-testid=home_callName]):not(:has([data-testid=home_go])){display:none!important}
+    form:has([data-testid=home_go]) > div:has([data-testid=home_callName]):not(:has([data-testid=home_go])),
+    form:has([data-testid=home_go]) div:has(> [data-testid=home_callName]){display:none!important}
+    /* Logged-in layout (a guest login left over from another tab's call):
+       the buttons share a row with the hidden field, and recent calls are
+       listed below. */
+    form:has([data-testid=home_go]) > div:has(> [data-testid=home_go]){grid-column:1/-1;display:flex;
+      justify-content:center;gap:12px}
+    main:has([data-testid=home_go]) [class*=_callList_]{display:none!important}
     form:has([data-testid=home_go]) > :has([data-testid=home_displayName]){grid-column:1/-1}
     form:has([data-testid=home_go]) > p{display:none}
     form button[data-testid=home_go][type=submit],form #ip-chatonly-btn{width:auto!important;min-width:0!important;padding-inline:28px!important}
