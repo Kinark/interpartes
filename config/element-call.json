@@ -16,5 +16,30 @@
       "delay_ms": 20000,
       "restart_ms": 5000
     }
+  },
+  "media_quality": {
+    "video_codec": "vp8",
+    "video": {
+      "max_resolution": 2160,
+      "max_bitrate": 8000000,
+      "max_framerate": 30
+    },
+    "screen_share": {
+      "max_resolution": 2160,
+      "max_bitrate": 12000000,
+      "max_framerate": 60,
+      "simulcast_layers": [
+        {
+          "height": 720,
+          "bitrate": 2000000,
+          "framerate": 30
+        },
+        {
+          "height": 1080,
+          "bitrate": 5000000,
+          "framerate": 60
+        }
+      ]
+    }
   }
 }
