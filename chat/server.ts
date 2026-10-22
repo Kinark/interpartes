@@ -150,7 +150,7 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 const files = new Map<string, string>();
-for (const name of ["index.html", "app.js", "style.css", "inject.js", "guard.js", "privacy.html"]) {
+for (const name of ["index.html", "app.js", "style.css", "inject.js", "guard.js", "kx.js", "privacy.html"]) {
   files.set(name, Deno.readTextFileSync(`${STATIC_DIR}/${name}`));
 }
 

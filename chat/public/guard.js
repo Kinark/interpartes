@@ -107,4 +107,78 @@
   }
   window.addEventListener("popstate", check);
   new MutationObserver(check).observe(document.documentElement, { childList: true, subtree: true });
+
+  // Forward secrecy for calls. Element Call encrypts media in a LiveKit
+  // worker with a key taken from the link's password. We intercept the
+  // messages it sends that worker: its link-derived key is dropped, and the
+  // worker gets keys from an ECDH exchange between the participants instead
+  // (kx.js), authenticated by that same password. Media therefore needs both
+  // the link and keys that only exist in the participants' memory during the
+  // call. Until the first exchanged key arrives, the worker has no key and
+  // sends nothing (it never falls back to unencrypted media).
+  const kxScript = document.createElement("script");
+  kxScript.src = "/chat/kx.js";
+  kxScript.onload = () => workers.size && startCallKx();
+  document.head.append(kxScript);
+
+  const NativeWorker = window.Worker;
+  const workers = new Set();
+  let callKx = null;
+  let callKey = null; // { idx, key }
+
+  function callParams() {
+    const h = location.hash;
+    const i = h.indexOf("?");
+    if (i === -1) return null;
+    const p = new URLSearchParams(h.slice(i));
+    const roomId = p.get("roomId");
+    const password = p.get("password");
+    return roomId && password ? { roomId, password } : null;
+  }
+
+  function postKey(w) {
+    if (!callKey) return;
+    NativeWorker.prototype.postMessage.call(w, {
+      kind: "setKey",
+      data: { participantIdentity: undefined, isPublisher: true, key: callKey.key, keyIndex: callKey.idx, updateCurrentKeyIndex: true },
+    });
+  }
+
+  function startCallKx() {
+    if (callKx) return;
+    const c = callParams();
+    if (!c || !window.IPKX) return;
+    callKx = window.IPKX.session({
+      secret: c.password,
+      roomId: c.roomId,
+      scope: "call",
+      async onKey(idx, bytes) {
+        const key = await crypto.subtle.importKey("raw", bytes, "HKDF", false, ["deriveBits", "deriveKey"]);
+        callKey = { idx, key };
+        for (const w of workers) postKey(w);
+        window.dispatchEvent(new CustomEvent("ip-call-keyed"));
+      },
+    });
+  }
+
+  window.Worker = class extends NativeWorker {
+    postMessage(msg, ...rest) {
+      const kind = msg?.kind;
+      if (kind === "init" && msg.data?.keyProviderOptions?.sharedKey) {
+        // LiveKit's E2EE worker for a shared-key (password) call.
+        this.ipE2EE = true;
+        workers.add(this);
+        super.postMessage(msg, ...rest);
+        startCallKx();
+        postKey(this);
+        return;
+      }
+      if (this.ipE2EE && (kind === "setKey" || kind === "ratchetRequest")) return;
+      super.postMessage(msg, ...rest);
+    }
+    terminate() {
+      workers.delete(this);
+      super.terminate();
+    }
+  };
 })();

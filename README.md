@@ -61,6 +61,19 @@ accounts are created through it. To undo: remove the nginx.conf mount and run
   key in the link. A call and its side chat show the same code. If everyone
   reads out the same digits, everyone holds the same key. A call link without
   a password shows a red "not end-to-end encrypted" warning instead.
+- **Forward secrecy for calls and chats** (`chat/public/kx.js`): every browser
+  makes a throwaway ECDH (P-256) key pair when it joins. The member with the
+  lowest random id picks a random group key and sends it to each member,
+  encrypted with an ECDH-derived key; a new one is made whenever someone joins
+  or leaves. All of this goes through the chat relay, sealed with a key
+  derived from the link secret, so the server can't read or inject it. The
+  media/message key is HKDF(group key + link secret): it takes both, so the
+  server can't hand out its own key (safety code still holds), and a link
+  found later can't decrypt recorded traffic (the ECDH and group keys only
+  ever exist in memory). For calls, `guard.js` wraps `window.Worker` and
+  replaces the password key Element Call gives LiveKit's E2EE worker with
+  these keys; until the first one arrives the worker has no key and sends
+  nothing.
 - **Proxy logs**: Caddy's proxy warnings and handler errors (written for all
   sites) are logged without IP, port or request headers (global log options set
   by labels on `interpartes-chat`).
@@ -136,8 +149,10 @@ only ever see a random name.
   call (and only people with the call link) shares it. It joins automatically
   with the call's display name (read from the guest's own Matrix profile, and
   re-read on each message so renames in call settings carry over).
-- The key never leaves the browser (it's after `#`). Keys are derived with
-  HKDF; messages are AES-256-GCM, padded to 256-byte buckets. The relay only
+- The key never leaves the browser (it's after `#`), and the chat removes it
+  from the address bar and history once open ("Copy link" still has it;
+  reloading means opening the link again). Messages are AES-256-GCM with the
+  forward-secret group key (see above), padded to 256-byte buckets. The relay only
   sees an opaque room tag and ciphertext, keeps nothing on disk or in logs, and
   forgets a room the moment its last socket closes. No history: you see only
   messages sent while you're connected.

@@ -3,19 +3,20 @@
 // Link formats (everything after # stays in the browser):
 //   /chat/#k=<secret>                 standalone chat
 //   /chat/#r=<roomId>&k=<password>    chat for an Element Call room
-// Keys are derived with HKDF from the secret (salted with the room ID), so the
-// relay only ever sees an opaque room tag and AES-GCM ciphertext.
+// The secret authenticates a fresh ECDH group key exchange (see kx.js), so the
+// relay only ever sees an opaque room tag and AES-GCM ciphertext, and a link
+// found later can't decrypt anything recorded earlier.
 
 const MAX_TEXT = 4000;
 const MAX_NAME = 40;
-const PAD_TO = 256;
-const MAX_SKEW_MS = 5 * 60_000;
 // One-shot nickname from the home page's "Chat" button (see inject.js).
 const HANDOFF_KEY = "interpartes-chat-handoff";
 
+// Read once: the address bar is cleared when the chat starts.
+const LINK = parseHashOnce();
+const EMBEDDED = LINK.embedded;
 const $ = (id) => document.getElementById(id);
 const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 function b64(bytes) {
   let s = "";
@@ -25,42 +26,10 @@ function b64(bytes) {
   return btoa(s);
 }
 
-function unb64(s) {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 // Room secrets are 24 bytes (192 bits, 32 characters); message IDs need only 16.
 function randomSecret(bytes = 24) {
   const b = crypto.getRandomValues(new Uint8Array(bytes));
   return b64(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function hex(buf) {
-  return Array.from(new Uint8Array(buf), (x) => x.toString(16).padStart(2, "0")).join("");
-}
-
-async function deriveKeys(secret, roomId) {
-  const base = await crypto.subtle.importKey("raw", enc.encode(secret), "HKDF", false, [
-    "deriveBits",
-    "deriveKey",
-  ]);
-  const salt = enc.encode("interpartes-chat-v1|" + (roomId || ""));
-  const tagBits = await crypto.subtle.deriveBits(
-    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode("room-tag") },
-    base,
-    256,
-  );
-  const key = await crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode("message-key") },
-    base,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
-  return { tag: hex(tagBits), key, safety: await safetyCode(base, salt) };
 }
 
 // Short code everyone in a room can compare out loud. Same derivation as the
@@ -81,31 +50,7 @@ async function safetyCode(base, salt) {
   return d.match(/.{3}/g).join(" ");
 }
 
-async function seal(key, obj) {
-  const body = enc.encode(JSON.stringify(obj));
-  // Pad so ciphertext length only reveals a rough size bucket.
-  const padded = new Uint8Array(Math.ceil((body.length + 4) / PAD_TO) * PAD_TO);
-  new DataView(padded.buffer).setUint32(0, body.length);
-  padded.set(body, 4);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, padded));
-  const out = new Uint8Array(12 + ct.length);
-  out.set(iv);
-  out.set(ct, 12);
-  return b64(out);
-}
-
-async function open(key, data) {
-  const raw = unb64(data);
-  const pt = new Uint8Array(
-    await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.subarray(0, 12) }, key, raw.subarray(12)),
-  );
-  const len = new DataView(pt.buffer).getUint32(0);
-  if (len > pt.length - 4) throw new Error("bad padding");
-  return JSON.parse(dec.decode(pt.subarray(4, 4 + len)));
-}
-
-function parseHash() {
+function parseHashOnce() {
   const p = new URLSearchParams(location.hash.slice(1));
   return {
     secret: p.get("k"),
@@ -156,112 +101,64 @@ function showScreen(id) {
 
 // ---------- Chat session ----------
 
-let ws = null;
-let keys = null;
+let kx = null;
 let myName = "";
-let myId = null;
+let shareLink = "";
 let closedByUser = false;
-let retry = 0;
 const names = new Map();
-const seen = new Set();
 
 function peerName(id) {
   return names.get(id) || "Someone";
 }
 
-async function sendObj(obj) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-  ws.send(await seal(keys.key, { ...obj, id: randomSecret(16), ts: Date.now() }));
-  return true;
+function onStatus(s) {
+  if (s.full) return setStatus("This chat is full", false);
+  if (!s.connected) return setStatus("Disconnected · reconnecting…", false);
+  if (!s.keyed) return setStatus("Securing…", false);
+  setStatus(s.n === 1 ? "Connected · only you here" : `Connected · ${s.n} here`, true);
 }
 
-async function onFrame(msg) {
-  if (msg.t === "ready") {
-    myId = msg.id;
-    retry = 0;
-    setStatus(msg.n === 1 ? "Connected · only you here" : `Connected · ${msg.n} here`, true);
-    await sendObj({ k: "hi", n: myName });
-    return;
+function onMessage(from, m) {
+  if (typeof m.x !== "string" || typeof m.ts !== "number") return;
+  const n = cleanName(m.n) || peerName(from);
+  names.set(from, n);
+  addLine("theirs", [
+    ["who", n],
+    ["when", clock(m.ts)],
+    ["text", m.x.slice(0, MAX_TEXT)],
+  ]);
+  if (EMBEDDED) {
+    window.parent.postMessage({ interpartesChat: "unread" }, location.origin);
   }
-  if (msg.t === "j") {
-    setStatus(`Connected · ${msg.n} here`, true);
-    await sendObj({ k: "hi", n: myName });
-    return;
-  }
-  if (msg.t === "l") {
-    setStatus(msg.n === 1 ? "Connected · only you here" : `Connected · ${msg.n} here`, true);
-    if (names.has(msg.f)) notice(`${peerName(msg.f)} left`);
-    names.delete(msg.f);
-    return;
-  }
-  if (msg.t === "slow") {
-    notice("Slow down: message not sent");
-    return;
-  }
-  if (msg.t !== "m" || typeof msg.d !== "string") return;
-
-  let m;
-  try {
-    m = await open(keys.key, msg.d);
-  } catch {
-    return; // not for this key, or tampered with
-  }
-  if (typeof m.id !== "string" || seen.has(m.id)) return;
-  if (typeof m.ts !== "number" || Math.abs(Date.now() - m.ts) > MAX_SKEW_MS) return;
-  seen.add(m.id);
-
-  if (m.k === "hi") {
-    const n = cleanName(m.n) || "Someone";
-    const known = names.has(msg.f);
-    names.set(msg.f, n);
-    if (!known) notice(`${n} joined`);
-  } else if (m.k === "msg" && typeof m.x === "string") {
-    const n = cleanName(m.n) || peerName(msg.f);
-    names.set(msg.f, n);
-    addLine("theirs", [
-      ["who", n],
-      ["when", clock(m.ts)],
-      ["text", m.x.slice(0, MAX_TEXT)],
-    ]);
-    if (parseHash().embedded) {
-      window.parent.postMessage({ interpartesChat: "unread" }, location.origin);
-    }
-  }
-}
-
-function connect() {
-  setStatus("Connecting…", false);
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${proto}//${location.host}/chat/ws`);
-  ws.onopen = () => ws.send(JSON.stringify({ join: keys.tag }));
-  ws.onmessage = (ev) => {
-    let msg;
-    try {
-      msg = JSON.parse(ev.data);
-    } catch {
-      return;
-    }
-    onFrame(msg).catch(() => {});
-  };
-  ws.onclose = (ev) => {
-    names.clear();
-    if (closedByUser) return;
-    if (ev.code === 4003) {
-      setStatus("This chat is full", false);
-      return;
-    }
-    const delay = Math.min(30_000, 1000 * 2 ** retry++);
-    setStatus("Disconnected · reconnecting…", false);
-    setTimeout(connect, delay);
-  };
 }
 
 async function start(secret, roomId) {
-  keys = await deriveKeys(secret, roomId);
-  $("safety").textContent = keys.safety;
+  const base = await crypto.subtle.importKey("raw", enc.encode(secret), "HKDF", false, ["deriveBits"]);
+  $("safety").textContent = await safetyCode(base, enc.encode("interpartes-chat-v1|" + (roomId || "")));
+  shareLink = `${location.origin}/chat/#${new URLSearchParams({ k: secret })}`;
+  // Keep the key out of the address bar and history; "Copy link" still has it.
+  history.replaceState(null, "", "/chat/");
   showScreen("chat");
-  notice("Messages are end-to-end encrypted and never stored. You only see messages sent while you're here.");
-  connect();
+  notice(
+    "Messages are end-to-end encrypted with fresh keys that only exist while you're here, and never stored. You only see messages sent while you're here.",
+  );
+  kx = IPKX.session({
+    secret,
+    roomId,
+    scope: "chat",
+    meta: { n: myName },
+    onStatus,
+    onMessage,
+    onPeer(id, meta) {
+      const n = cleanName(meta?.n) || "Someone";
+      names.set(id, n);
+      notice(`${n} joined`);
+    },
+    onLeave(id) {
+      if (!closedByUser && names.has(id)) notice(`${peerName(id)} left`);
+      names.delete(id);
+    },
+  });
   $("text").focus();
 }
 
@@ -270,11 +167,11 @@ $("send").addEventListener("submit", async (e) => {
   const input = $("text");
   const x = input.value.trim().slice(0, MAX_TEXT);
   if (!x) return;
-  if (parseHash().embedded) {
+  if (EMBEDDED) {
     // Follow name changes made in the call's settings.
     myName = (await callDisplayName()) || myName;
   }
-  if (!(await sendObj({ k: "msg", n: myName, x }))) {
+  if (!(await kx?.send({ n: myName, x, ts: Date.now() }))) {
     notice("Not connected: message not sent");
     return;
   }
@@ -295,9 +192,9 @@ $("text").addEventListener("keydown", (e) => {
 
 $("leave").addEventListener("click", () => {
   closedByUser = true;
-  ws?.close();
+  kx?.close();
   log.replaceChildren();
-  if (parseHash().embedded) {
+  if (EMBEDDED) {
     window.parent.postMessage({ interpartesChat: "close" }, location.origin);
   } else {
     location.replace("/");
@@ -305,7 +202,7 @@ $("leave").addEventListener("click", () => {
 });
 
 $("copy").addEventListener("click", async () => {
-  await navigator.clipboard.writeText(location.href);
+  await navigator.clipboard.writeText(shareLink);
   $("copy").textContent = "Copied";
   setTimeout(() => ($("copy").textContent = "Copy link"), 1500);
 });
@@ -316,7 +213,7 @@ $("join-form").addEventListener("submit", (e) => {
   e.preventDefault();
   myName = cleanName($("name").value);
   if (!myName) return;
-  let { secret, roomId } = parseHash();
+  let { secret, roomId } = LINK;
   if (!secret) {
     secret = randomSecret();
     history.replaceState(null, "", `#${new URLSearchParams({ k: secret })}`);
@@ -342,7 +239,7 @@ async function callDisplayName() {
 }
 
 (async function init() {
-  const { secret, roomId, embedded } = parseHash();
+  const { secret, roomId, embedded } = LINK;
   document.body.classList.toggle("embedded", embedded);
   $("join-title").textContent = secret ? "Join chat" : "Start new chat";
   $("join-go").textContent = secret ? "Join" : "Start";

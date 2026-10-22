@@ -16,11 +16,15 @@
         <li>
           <strong>Call audio, video and screen sharing.</strong> They are end-to-end encrypted in your
           browser with a key that is part of the call link, after the <code>#</code>. Browsers never
-          send that part of a link to a server, so the server forwards media it cannot decode.
+          send that part of a link to a server, so the server forwards media it cannot decode. On top
+          of that, the participants' browsers agree on fresh keys when the call starts and whenever
+          someone joins or leaves. Those keys only exist in memory, so even someone who recorded the
+          encrypted call and finds the link later can't decode it.
         </li>
         <li>
-          <strong>Chat messages.</strong> Encrypted the same way (AES-256-GCM, key derived from the
-          link). The server relays ciphertext, never stores it, and forgets a chat room the moment
+          <strong>Chat messages.</strong> Encrypted the same way (AES-256-GCM, fresh keys agreed by
+          the participants plus the link's key). The key is removed from the address bar once the
+          chat opens, so it doesn't stay in your browser history. The server relays ciphertext, never stores it, and forgets a chat room the moment
           the last person leaves.
         </li>
       </ul>
