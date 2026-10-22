@@ -233,32 +233,16 @@
         .replace(/\//g, "_")
         .replace(/=+$/, "");
       const p = new URLSearchParams({ k: secret });
+      // Handed to the chat page once; it deletes it as soon as it reads it.
       if (nameInput?.value.trim()) {
-        sessionStorage.setItem(NAME_KEY, nameInput.value.trim().slice(0, 40));
+        sessionStorage.setItem("interpartes-chat-handoff", nameInput.value.trim().slice(0, 40));
       }
       location.assign(`/chat/#${p}`);
     };
     go.after(btn);
   }
 
-  // Share one display name per browser tab session between Element Call's
-  // guest name fields and the chat.
-  const NAME_KEY = "interpartes-chat-name";
-  const NAME_FIELDS = "[data-testid=home_displayName], [data-testid=joincall_displayName]";
-
-  function rememberName(el) {
-    if (el.dataset.ipName) return;
-    el.dataset.ipName = "1";
-    const saved = sessionStorage.getItem(NAME_KEY);
-    if (saved && !el.value) setInput(el, saved);
-    el.addEventListener("input", () => {
-      const v = el.value.trim().slice(0, 40);
-      if (v) sessionStorage.setItem(NAME_KEY, v);
-    });
-  }
-
   function sync() {
-    for (const el of document.querySelectorAll(NAME_FIELDS)) rememberName(el);
     if (location.pathname === "/") {
       homeLayout();
       addChatOnlyButton();

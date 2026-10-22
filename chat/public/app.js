@@ -10,9 +10,8 @@ const MAX_TEXT = 4000;
 const MAX_NAME = 40;
 const PAD_TO = 256;
 const MAX_SKEW_MS = 5 * 60_000;
-// Per-tab session storage, shared with the Element Call pages (same origin).
-// Cleared when the tab is closed.
-const NAME_KEY = "interpartes-chat-name";
+// One-shot nickname from the home page's "Chat" button (see inject.js).
+const HANDOFF_KEY = "interpartes-chat-handoff";
 
 const $ = (id) => document.getElementById(id);
 const enc = new TextEncoder();
@@ -313,13 +312,10 @@ $("copy").addEventListener("click", async () => {
 
 // ---------- Entry ----------
 
-$("name").value = sessionStorage.getItem(NAME_KEY) || "";
-
 $("join-form").addEventListener("submit", (e) => {
   e.preventDefault();
   myName = cleanName($("name").value);
   if (!myName) return;
-  sessionStorage.setItem(NAME_KEY, myName);
   let { secret, roomId } = parseHash();
   if (!secret) {
     secret = randomSecret();
@@ -352,18 +348,18 @@ async function callDisplayName() {
   $("join-go").textContent = secret ? "Join" : "Start";
   $("copy").hidden = embedded;
 
-  // A name known for this browser session (the call's display name, or one
-  // typed earlier in this tab) lets you go straight into a chat link.
-  const profileName = await callDisplayName();
-  const saved = cleanName(sessionStorage.getItem(NAME_KEY));
-  const known = embedded ? profileName || saved : saved || profileName;
+  // Nicknames are never remembered. Two exceptions, both for the current
+  // step only: inside a call the chat uses the call's display name, and the
+  // home page's "Chat" button hands over the nickname just typed (deleted
+  // here on read).
+  const handoff = cleanName(sessionStorage.getItem(HANDOFF_KEY));
+  sessionStorage.removeItem(HANDOFF_KEY);
+  const known = embedded ? await callDisplayName() : handoff;
   if (secret && known) {
     myName = known;
-    sessionStorage.setItem(NAME_KEY, known);
     start(secret, roomId).catch(() => notice("Could not start the chat"));
     return;
   }
-  if (known && !$("name").value) $("name").value = known;
   showScreen("join");
   $("name").focus();
 })();

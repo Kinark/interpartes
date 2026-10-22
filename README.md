@@ -127,8 +127,9 @@ only ever see a random name.
 - **Chat-only rooms**: the home page (restyled by `inject.js` to "New Room / [Nickname] / Call · Chat", centered) has a "Chat" button next to "Call".
   It uses the same nickname but creates no call (and no Matrix room or
   account): it opens `/chat/#k=<secret>`. The creator joins straight away;
-  people opening the link enter a display name (kept in sessionStorage while
-  the tab is on the site, shared with Element Call's guest name fields). Also reachable directly
+  people opening the link enter a display name. Nicknames are never
+  remembered: every call and chat asks again (the "Chat" button hands the
+  typed nickname to the chat page once, which deletes it on read). Also reachable directly
   at https://interpartes.lo.fi/chat/.
 - **In a call**: a Chat button next to "End call" opens a side panel whose
   chat is keyed by the call's own `roomId` + `password`, so everyone in the
