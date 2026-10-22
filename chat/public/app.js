@@ -112,7 +112,6 @@ function parseHash() {
     secret: p.get("k"),
     roomId: p.get("r"),
     embedded: p.get("e") === "1",
-    title: cleanName(p.get("t")),
   };
 }
 
@@ -321,12 +320,10 @@ $("join-form").addEventListener("submit", (e) => {
   myName = cleanName($("name").value);
   if (!myName) return;
   sessionStorage.setItem(NAME_KEY, myName);
-  let { secret, roomId, title } = parseHash();
+  let { secret, roomId } = parseHash();
   if (!secret) {
     secret = randomSecret();
-    const p = new URLSearchParams({ k: secret });
-    if (title) p.set("t", title);
-    history.replaceState(null, "", `#${p}`);
+    history.replaceState(null, "", `#${new URLSearchParams({ k: secret })}`);
   }
   start(secret, roomId).catch(() => notice("Could not start the chat"));
 });
@@ -349,13 +346,9 @@ async function callDisplayName() {
 }
 
 (async function init() {
-  const { secret, roomId, embedded, title } = parseHash();
+  const { secret, roomId, embedded } = parseHash();
   document.body.classList.toggle("embedded", embedded);
-  if (title) {
-    document.title = `${title} · interpartes chat`;
-    $("room-title").textContent = title;
-  }
-  $("join-title").textContent = title || (secret ? "Join chat" : "Start new chat");
+  $("join-title").textContent = secret ? "Join chat" : "Start new chat";
   $("join-go").textContent = secret ? "Join" : "Start";
   $("copy").hidden = embedded;
 

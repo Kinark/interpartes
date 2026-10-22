@@ -127,42 +127,50 @@
   }
 
   // Home page layout:   New Room
-  //                     [Room name] as [Nickname]
-  //                       <Call>  <Chat>
+  //                      [Nickname]
+  //                    <Call>  <Chat>
   // Done with CSS over Element Call's own form so its logic stays intact.
+  // There is no room name: Element Call's field is hidden and filled with a
+  // random value (see fillRoomName), so no name ever reaches the server.
   const HOME_STYLE = `
     main:has([data-testid=home_go]){flex:1;display:flex;flex-direction:column;
       align-items:center;justify-content:center;padding-block:24px}
     main:has([data-testid=home_go]) h1{text-align:center;margin:0 0 24px}
     form:has([data-testid=home_go]){display:grid;grid-template-columns:1fr 1fr;
-      column-gap:44px;row-gap:24px;width:min(560px,calc(100vw - 32px));align-items:center}
+      column-gap:12px;row-gap:24px;width:min(360px,calc(100vw - 32px));align-items:center}
     form:has([data-testid=home_go]) > *{margin:0!important}
-    form:has([data-testid=home_go]) > :has([data-testid=home_callName]){position:relative}
-    form:has([data-testid=home_displayName]) > :has([data-testid=home_callName])::after{
-      content:"as";position:absolute;top:0;bottom:0;right:-44px;width:44px;
-      display:flex;align-items:center;justify-content:center;color:var(--cpd-color-text-secondary,#8d97a5)}
-    form:has([data-testid=home_go]):not(:has([data-testid=home_displayName])) > :has([data-testid=home_callName]){grid-column:1/-1}
+    form:has([data-testid=home_go]) > div:has([data-testid=home_callName]):not(:has([data-testid=home_go])){display:none!important}
+    form:has([data-testid=home_go]) > :has([data-testid=home_displayName]){grid-column:1/-1}
     form:has([data-testid=home_go]) > p{display:none}
-    form:has([data-testid=home_go]) > div:has(> [data-testid=home_go]){grid-column:1/-1;display:grid;
-      grid-template-columns:1fr 1fr;gap:24px 44px;margin:0}
-    div:has(> [data-testid=home_go]) > :has([data-testid=home_callName]){grid-column:1/-1;margin:0!important;width:auto!important}
-    div:has(> [data-testid=home_go]) > button{margin:0;width:auto}
-    @media (max-width:520px){div:has(> [data-testid=home_go]){column-gap:12px!important;row-gap:16px!important}}
-    /* Buttons hug their labels and sit close together in the middle, so they
-       don't read as belonging to the fields above. Grid gap is 44px; pulling
-       each in by 16px leaves 12px between them. */
     form button[data-testid=home_go][type=submit],form #ip-chatonly-btn{width:auto!important;min-width:0!important;padding-inline:28px!important}
-    form button[data-testid=home_go][type=submit]{justify-self:end;margin:0 -16px 0 0!important}
-    form #ip-chatonly-btn{justify-self:start;margin:0 0 0 -16px!important}
-    @media (max-width:520px){form button[data-testid=home_go][type=submit],form #ip-chatonly-btn{margin:0!important}}
-    @media (max-width:520px){
-      form:has([data-testid=home_go]){column-gap:12px;row-gap:16px}
-      form:has([data-testid=home_displayName]) > :has([data-testid=home_callName]){grid-column:1/-1}
-      form:has([data-testid=home_displayName]) > :has([data-testid=home_callName])::after{
-        top:auto;bottom:-16px;right:0;left:0;width:auto;height:16px;font-size:13px}
-      form:has([data-testid=home_go]) > :has([data-testid=home_displayName]){grid-column:1/-1}
-    }
+    form button[data-testid=home_go][type=submit]{justify-self:end}
+    form #ip-chatonly-btn{justify-self:start}
   `;
+
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+
+  // React controls these inputs: set via the native setter + input event.
+  function setInput(el, v) {
+    setValue.call(el, v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function fillRoomName(fresh) {
+    const el = document.querySelector("[data-testid=home_callName]");
+    if (!el || (el.value && !fresh)) return;
+    const b = crypto.getRandomValues(new Uint8Array(12));
+    setInput(el, Array.from(b, (x) => x.toString(16).padStart(2, "0")).join(""));
+  }
+
+  // A new random name for every call (capture phase: runs before React reads
+  // the form).
+  document.addEventListener(
+    "submit",
+    (e) => {
+      if (e.target.querySelector?.("[data-testid=home_callName]")) fillRoomName(true);
+    },
+    true,
+  );
 
   // Rename React-rendered text in place (same text node), so React's own
   // later updates such as "Loading…" still show.
@@ -183,11 +191,7 @@
     if (!go) return;
     relabel(go.closest("main")?.querySelector("h1"), "Start new call", "New Room");
     relabel(go, "Go", "Call");
-    const room = document.querySelector("[data-testid=home_callName]");
-    if (room && room.placeholder !== "Room name") {
-      room.placeholder = "Room name";
-      relabel(room.labels?.[0], "Name of call", "Room name");
-    }
+    fillRoomName(false);
     const nick = document.querySelector("[data-testid=home_displayName]");
     if (nick && nick.placeholder !== "Nickname") {
       nick.placeholder = "Nickname";
@@ -196,7 +200,7 @@
   }
 
   // Home page: a "Chat" button beside "Call" that starts a text-only room
-  // with the same name fields, without creating a call.
+  // with the same nickname, without creating a call.
   function addChatOnlyButton() {
     const go = document.querySelector("[data-testid=home_go]");
     if (!go || document.getElementById("ip-chatonly-btn")) return;
@@ -209,22 +213,19 @@
     btn.textContent = "Chat";
     btn.onclick = (e) => {
       e.preventDefault();
-      const room = document.querySelector("[data-testid=home_callName]");
       const nameInput = document.querySelector("[data-testid=home_displayName]");
-      // Same validation as "Go": name of call (and display name for guests).
-      for (const el of [room, nameInput]) {
-        if (el && !el.value.trim()) {
-          el.reportValidity?.();
-          el.focus();
-          return;
-        }
+      // Same validation as "Call": a nickname is required for guests.
+      if (nameInput && !nameInput.value.trim()) {
+        nameInput.reportValidity?.();
+        nameInput.focus();
+        return;
       }
       const secretBytes = crypto.getRandomValues(new Uint8Array(24));
       const secret = btoa(String.fromCharCode(...secretBytes))
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=+$/, "");
-      const p = new URLSearchParams({ k: secret, t: room.value.trim().slice(0, 40) });
+      const p = new URLSearchParams({ k: secret });
       if (nameInput?.value.trim()) {
         sessionStorage.setItem(NAME_KEY, nameInput.value.trim().slice(0, 40));
       }
@@ -242,12 +243,7 @@
     if (el.dataset.ipName) return;
     el.dataset.ipName = "1";
     const saved = sessionStorage.getItem(NAME_KEY);
-    if (saved && !el.value) {
-      // React controls these inputs: set via the native setter + input event.
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-      setter.call(el, saved);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    }
+    if (saved && !el.value) setInput(el, saved);
     el.addEventListener("input", () => {
       const v = el.value.trim().slice(0, 40);
       if (v) sessionStorage.setItem(NAME_KEY, v);

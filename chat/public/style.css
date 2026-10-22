@@ -122,18 +122,6 @@ textarea:focus {
   min-width: 0;
 }
 
-#room-title {
-  color: var(--text);
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#room-title:empty {
-  display: none;
-}
-
 #status.ok::before {
   content: "";
   display: inline-block;

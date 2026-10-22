@@ -28,8 +28,8 @@
       <h2>What the server does see, and for how long</h2>
       <ul>
         <li>
-          While a call is running: the room name you typed, the nickname of each participant, a
-          random guest account per person, and when each one joined or left. The database lives
+          While a call is running: a random room name (there is nothing to type), the nickname of
+          each participant, a random guest account per person, and when each one joined or left. The database lives
           only in memory. About 30 seconds after a call ends the room and its guest accounts are
           erased, and a server restart wipes everything.
         </li>
@@ -43,6 +43,9 @@
           the size of messages rounded up to 256 bytes.
         </li>
       </ul>
+      <p>Your browser keeps nothing either: the guest login, nickname, call keys and caches are
+        deleted when a call ends, when you leave or close the page, and when the home page
+        opens.</p>
       <p>No analytics, crash reporting or third-party services: the browser is told (by the
         <code>Content-Security-Policy</code> header) to refuse connections to any other server.</p>
 

@@ -108,17 +108,27 @@ is not honest.
   rooms forgotten on leave; message retention at most 1 day.
 
 On disk only: config files, the Synapse signing key, `.env` and the TLS cert.
-In the browser: Element Call keeps the guest login in localStorage. Once the
-account is erased, that login is rejected and the app discards it.
+In the browser: `guard.js` deletes everything this origin stores (localStorage
+with the guest login and `room-shared-key-*` call passwords, sessionStorage with
+the nickname, and Element Call's IndexedDB sync/crypto/log databases) when a
+call ends, when the page unloads, and when the home page loads. It skips the
+wipe while another interpartes tab is open (tabs mark themselves with an
+`ip-tab:*` heartbeat in localStorage). Reloading during a call therefore asks
+you to join as a guest again. Element Call's "Your call has ended / How did it
+go?" screen is never shown: `guard.js` hides it and goes straight to the home
+page.
+
+No room names: `inject.js` hides Element Call's "Name of call" field and fills
+it with 24 random hex characters for every call, so the server and the link
+only ever see a random name.
 
 ## Chat (`/chat`)
 `chat/server.ts` is a tiny WebSocket relay; `chat/public/` is the web page.
-- **Chat-only rooms**: the home page (restyled by `inject.js` to "New Room / [Room name] as [Nickname] / Call · Chat", centered) has a "Chat" button next to "Call".
-  It uses the same name fields but creates no call (and no Matrix room or
-  account): it opens `/chat/#k=<secret>&t=<name>`. The creator joins straight
-  away; people opening the link enter a display name (once per browser tab:
-  the name is kept in sessionStorage, shared with Element Call's guest name
-  fields, and forgotten when the tab closes). Also reachable directly
+- **Chat-only rooms**: the home page (restyled by `inject.js` to "New Room / [Nickname] / Call · Chat", centered) has a "Chat" button next to "Call".
+  It uses the same nickname but creates no call (and no Matrix room or
+  account): it opens `/chat/#k=<secret>`. The creator joins straight away;
+  people opening the link enter a display name (kept in sessionStorage while
+  the tab is on the site, shared with Element Call's guest name fields). Also reachable directly
   at https://interpartes.lo.fi/chat/.
 - **In a call**: a Chat button next to "End call" opens a side panel whose
   chat is keyed by the call's own `roomId` + `password`, so everyone in the
