@@ -74,16 +74,37 @@
   }
   if (location.pathname === "/") forget();
 
-  // Skip Element Call's "Your call has ended. How did it go?" screen: forget
-  // the visit and go straight back to the home page.
+  // Leaving a call must end the session. Element Call either shows its
+  // "Your call has ended. How did it go?" screen or moves to its home page
+  // inside the app, still signed in (profile badge, no nickname field). In
+  // every case: wipe the tab and load a fresh home page. Also if a signed-in
+  // home page ever shows up for any other reason.
   const style = document.createElement("style");
-  style.textContent = "#root:has([class*=_callEndedContent_]){visibility:hidden}";
+  style.textContent =
+    "#root:has([class*=_callEndedContent_]),#root:has([data-testid=usermenu_open]):not(:has([data-testid=incall_leave])){visibility:hidden}";
   document.head.append(style);
-  let ended = false;
-  new MutationObserver(() => {
-    if (ended || !document.querySelector("[class*=_callEndedContent_]")) return;
-    ended = true;
+  const startedInRoom = location.pathname.startsWith("/room");
+  let resetting = false;
+  function reset() {
+    if (resetting) return;
+    resetting = true;
     forget();
     location.replace("/");
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  }
+  function check() {
+    if (resetting) return;
+    if (document.querySelector("[class*=_callEndedContent_]")) return reset();
+    if (startedInRoom && !location.pathname.startsWith("/room")) return reset();
+    if (location.pathname === "/" && document.querySelector("[data-testid=usermenu_open]")) return reset();
+  }
+  for (const m of ["pushState", "replaceState"]) {
+    const orig = history[m];
+    history[m] = function (...args) {
+      const r = orig.apply(this, args);
+      check();
+      return r;
+    };
+  }
+  window.addEventListener("popstate", check);
+  new MutationObserver(check).observe(document.documentElement, { childList: true, subtree: true });
 })();
