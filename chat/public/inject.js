@@ -295,13 +295,14 @@
     #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
     #ip-netcheck .ip-safe[aria-expanded=true] .ip-chev{transform:rotate(180deg)}
     /* Opening: the box grows, then the lines fade in top to bottom.
-       Closing: the lines fade out bottom to top first, and the box only
-       starts shrinking (slowly at first) once they're nearly gone, so no
-       line is ever cut off while still visible. */
+       Closing: the box shrinks right away while the lines fade out bottom
+       to top. Nothing is clipped (overflow stays visible), so a line still
+       fading is never cut off; min-height:0 lets the row collapse anyway. */
     #ip-netcheck .ip-safe-list{display:grid;grid-template-rows:0fr;
-      transition:grid-template-rows .6s cubic-bezier(.55,0,.75,.2) .18s}
-    #ip-netcheck .ip-safe-list > ul{overflow:hidden;margin:0;padding:0 6px;list-style:none;text-align:center;
-      color:#8d97a5;font-size:12.5px;line-height:1.5;transition:padding-top .6s cubic-bezier(.55,0,.75,.2) .18s}
+      transition:grid-template-rows .6s ease-in-out}
+    #ip-netcheck .ip-safe-list > ul{overflow:visible;min-height:0;margin:0;padding:0 6px;list-style:none;text-align:center;
+      color:#8d97a5;font-size:12.5px;line-height:1.5;transition:padding-top .6s ease-in-out}
+    #ip-netcheck:not(.open) .ip-safe-list > ul{pointer-events:none}
     #ip-netcheck.open .ip-safe-list{grid-template-rows:1fr;transition:grid-template-rows .55s cubic-bezier(.2,.7,.3,1)}
     #ip-netcheck.open .ip-safe-list > ul{padding-top:8px;transition:padding-top .55s cubic-bezier(.2,.7,.3,1)}
     #ip-netcheck .ip-safe-list li{opacity:0;transform:translateY(-4px);transition:opacity .16s ease-in,transform .16s ease-in}
