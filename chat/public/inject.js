@@ -288,7 +288,7 @@
     #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
     #ip-netcheck .ip-safe[aria-expanded=true] .ip-chev{transform:rotate(180deg)}
     #ip-netcheck .ip-safe-list{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
-    #ip-netcheck .ip-safe-list > ul{overflow:hidden;margin:0;padding:0 6px;list-style:none;
+    #ip-netcheck .ip-safe-list > ul{overflow:hidden;margin:0;padding:0 6px;list-style:none;text-align:center;
       color:#8d97a5;font-size:12.5px;line-height:1.5}
     #ip-netcheck.open .ip-safe-list{grid-template-rows:1fr}
     #ip-netcheck.open .ip-safe-list > ul{padding-top:8px}
