@@ -8,6 +8,7 @@
 // found later can't decrypt anything recorded earlier.
 
 const MAX_TEXT = 4000;
+const t = IPI18N.t;
 const MAX_NAME = 40;
 // One-shot nickname from the home page's "Chat" button (see inject.js).
 const HANDOFF_KEY = "interpartes-chat-handoff";
@@ -108,7 +109,7 @@ let closedByUser = false;
 const names = new Map();
 
 function peerName(id) {
-  return names.get(id) || "Someone";
+  return names.get(id) || t("someone");
 }
 
 // Connection check findings (netcheck.js): yours and everyone else's, shown
@@ -118,17 +119,17 @@ let myRisk = [];
 
 function showRisks() {
   const box = $("risks");
-  const lines = myRisk.map((r) => "You: your device " + IPNC.describe(r));
+  const lines = myRisk.map((r) => t("you") + ": " + IPNC.describe(r));
   for (const [id, rs] of risks) for (const r of rs) lines.push(`${peerName(id)}: ${IPNC.describe(r)}`);
   box.hidden = !lines.length;
   $("risk-list").replaceChildren(...lines.map((l) => Object.assign(document.createElement("li"), { textContent: l })));
 }
 
 function onStatus(s) {
-  if (s.full) return setStatus("This chat is full", false);
-  if (!s.connected) return setStatus("Disconnected · reconnecting…", false);
-  if (!s.keyed) return setStatus("Securing…", false);
-  setStatus(s.n === 1 ? "Connected · only you here" : `Connected · ${s.n} here`, true);
+  if (s.full) return setStatus(t("full"), false);
+  if (!s.connected) return setStatus(t("disconnected"), false);
+  if (!s.keyed) return setStatus(t("securing"), false);
+  setStatus(s.n === 1 ? t("alone") : t("nHere", { n: s.n }), true);
 }
 
 function onMessage(from, m) {
@@ -152,9 +153,7 @@ async function start(secret, roomId) {
   // Keep the key out of the address bar and history; "Copy link" still has it.
   history.replaceState(null, "", "/chat/");
   showScreen("chat");
-  notice(
-    "Messages are end-to-end encrypted with fresh keys that only exist while you're here, and never stored. You only see messages sent while you're here.",
-  );
+  notice(t("intro"));
   kx = IPKX.session({
     secret,
     roomId,
@@ -163,16 +162,16 @@ async function start(secret, roomId) {
     onStatus,
     onMessage,
     onPeer(id, meta, isUpdate) {
-      const n = cleanName(meta?.n) || "Someone";
+      const n = cleanName(meta?.n) || t("someone");
       names.set(id, n);
-      if (!isUpdate) notice(`${n} joined`);
+      if (!isUpdate) notice(t("joined", { n }));
       const r = IPNC.clean(meta?.risk);
       if (r.length) risks.set(id, r);
       else risks.delete(id);
       showRisks();
     },
     onLeave(id) {
-      if (!closedByUser && names.has(id)) notice(`${peerName(id)} left`);
+      if (!closedByUser && names.has(id)) notice(t("left", { n: peerName(id) }));
       names.delete(id);
       if (risks.delete(id)) showRisks();
     },
@@ -195,7 +194,7 @@ $("send").addEventListener("submit", async (e) => {
     myName = (await callDisplayName()) || myName;
   }
   if (!(await kx?.send({ n: myName, x, ts: Date.now() }))) {
-    notice("Not connected: message not sent");
+    notice(t("notSent"));
     return;
   }
   input.value = "";
@@ -226,8 +225,8 @@ $("leave").addEventListener("click", () => {
 
 $("copy").addEventListener("click", async () => {
   await navigator.clipboard.writeText(shareLink);
-  $("copy").textContent = "Copied";
-  setTimeout(() => ($("copy").textContent = "Copy link"), 1500);
+  $("copy").textContent = t("copied");
+  setTimeout(() => ($("copy").textContent = t("copyLink")), 1500);
 });
 
 // ---------- Entry ----------
@@ -241,7 +240,7 @@ $("join-form").addEventListener("submit", (e) => {
     secret = randomSecret();
     history.replaceState(null, "", `#${new URLSearchParams({ k: secret })}`);
   }
-  start(secret, roomId).catch(() => notice("Could not start the chat"));
+  start(secret, roomId).catch(() => notice(t("startFail")));
 });
 
 // In a call, use the same display name as the call: read it from the guest's
@@ -266,8 +265,11 @@ async function callDisplayName() {
 (async function init() {
   const { secret, roomId, embedded } = LINK;
   document.body.classList.toggle("embedded", embedded);
-  $("join-title").textContent = secret ? "Join chat" : "Start new chat";
-  $("join-go").textContent = secret ? "Join" : "Start";
+  document.documentElement.lang = IPI18N.lang;
+  document.title = t("pageTitle");
+  IPI18N.apply();
+  $("join-title").textContent = secret ? t("joinChat") : t("startChat");
+  $("join-go").textContent = secret ? t("join") : t("start");
   $("copy").hidden = embedded;
 
   // Nicknames are never remembered. Two exceptions, both for the current
@@ -279,7 +281,7 @@ async function callDisplayName() {
   const known = embedded ? await callDisplayName() : handoff;
   if (secret && known) {
     myName = known;
-    start(secret, roomId).catch(() => notice("Could not start the chat"));
+    start(secret, roomId).catch(() => notice(t("startFail")));
     return;
   }
   showScreen("join");

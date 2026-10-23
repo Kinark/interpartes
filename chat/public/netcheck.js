@@ -196,6 +196,6 @@
   window.IPNC = Object.freeze({
     result: parentResult || run().catch(() => ["unchecked"]),
     clean,
-    describe: (code) => LABELS[code] || "",
+    describe: (code) => (code in LABELS ? window.IPI18N?.t("risk." + code) || LABELS[code] : ""),
   });
 })();

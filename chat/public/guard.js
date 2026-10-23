@@ -119,6 +119,10 @@
   // Connection check (netcheck.js): starts as the site loads. Its findings
   // go to the others in the call with this member's key exchange message,
   // and theirs come back the same way (shown by inject.js).
+  const i18nScript = document.createElement("script");
+  i18nScript.src = "/chat/i18n.js";
+  i18nScript.onload = () => window.dispatchEvent(new CustomEvent("ip-i18n-loaded"));
+  document.head.append(i18nScript);
   const ncScript = document.createElement("script");
   ncScript.src = "/chat/netcheck.js";
   ncScript.onload = () => window.dispatchEvent(new CustomEvent("ip-netcheck-loaded"));

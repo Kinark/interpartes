@@ -3,7 +3,13 @@
 // Loaded into Element Call. Adds a "Chat" button to the in-call controls that
 // opens /chat in a side panel, keyed by the call's roomId + password (both
 // taken from the URL fragment, so nothing new is sent to the server).
-(function () {
+(function main() {
+  // Strings come from i18n.js (loaded by guard.js); wait for it.
+  if (!window.IPI18N) {
+    window.addEventListener("ip-i18n-loaded", main, { once: true });
+    return;
+  }
+  const t = window.IPI18N.t;
   const ICON =
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8.4l-3.7 3.2A1 1 0 0 1 3 20.4V6a2 2 0 0 1 2-2Zm1 2v12.2L7.6 16H20V6H5Zm2 3h10v2H7V9Zm0 3h7v2H7v-2Z"/></svg>';
@@ -44,10 +50,10 @@
     panel.hidden = true;
     const header = document.createElement("header");
     const title = document.createElement("span");
-    title.textContent = "Chat";
+    title.textContent = t("chat");
     const close = document.createElement("button");
     close.type = "button";
-    close.setAttribute("aria-label", "Close chat");
+    close.setAttribute("aria-label", t("closeChat"));
     close.textContent = "×";
     close.onclick = () => toggle(false);
     header.append(title, close);
@@ -68,7 +74,7 @@
     if (open && (!frame || current !== key)) {
       frame?.remove();
       frame = document.createElement("iframe");
-      frame.title = "Encrypted chat";
+      frame.title = t("encryptedChat");
       frame.setAttribute("referrerpolicy", "no-referrer");
       frame.src = chatUrl(c);
       panel.append(frame);
@@ -115,8 +121,8 @@
     btn.dataset.size = ref.dataset.size || "lg";
     btn.setAttribute("role", "switch");
     btn.setAttribute("aria-checked", String(!!panel && !panel.hidden));
-    btn.setAttribute("aria-label", "Chat");
-    btn.title = "Chat";
+    btn.setAttribute("aria-label", t("chat"));
+    btn.title = t("chat");
     btn.style.position = "relative";
     btn.innerHTML = ICON;
     btn.onclick = (e) => {
@@ -180,10 +186,15 @@
   );
 
   // Rename React-rendered text in place (same text node), so React's own
-  // later updates such as "Loading…" still show.
-  function relabel(el, from, to) {
+  // later updates such as "Loading…" still show. Element Call translates its
+  // labels itself, so the text to replace is whatever it first showed, in
+  // whichever language.
+  const firstSeen = new Map();
+  function relabel(el, name, to) {
     for (const n of el?.childNodes || []) {
-      if (n.nodeType === Node.TEXT_NODE && n.nodeValue === from) n.nodeValue = to;
+      if (n.nodeType !== Node.TEXT_NODE || !n.nodeValue.trim()) continue;
+      if (!firstSeen.has(name) && n.nodeValue !== to) firstSeen.set(name, n.nodeValue);
+      if (n.nodeValue === firstSeen.get(name)) n.nodeValue = to;
     }
   }
 
@@ -196,13 +207,13 @@
     }
     const go = document.querySelector("[data-testid=home_go]");
     if (!go) return;
-    relabel(go.closest("main")?.querySelector("h1"), "Start new call", "New Room");
-    relabel(go, "Go", "Call");
+    relabel(go.closest("main")?.querySelector("h1"), "title", t("newRoom"));
+    relabel(go, "go", t("call"));
     fillRoomName(false);
     const nick = document.querySelector("[data-testid=home_displayName]");
-    if (nick && nick.placeholder !== "Nickname") {
-      nick.placeholder = "Nickname";
-      relabel(nick.labels?.[0], "Display name", "Nickname");
+    if (nick && nick.placeholder !== t("nickname")) {
+      nick.placeholder = t("nickname");
+      relabel(nick.labels?.[0], "nick", t("nickname"));
     }
   }
 
@@ -217,7 +228,7 @@
     btn.className = go.className;
     btn.dataset.kind = "primary";
     btn.dataset.size = go.dataset.size || "lg";
-    btn.textContent = "Chat";
+    btn.textContent = t("chat");
     btn.onclick = (e) => {
       e.preventDefault();
       const nameInput = document.querySelector("[data-testid=home_displayName]");
@@ -248,10 +259,54 @@
   const NC_STYLE = `
     #ip-netcheck{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:8px;
       font:14px/1.4 system-ui,sans-serif;background:rgba(127,127,127,.12)}
-    #ip-netcheck.ok{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;
-      color:#0dbd8b;background:rgba(13,189,139,.1);border:1px solid rgba(13,189,139,.35)}
-    #ip-netcheck.ok b{font-size:15px;font-weight:600;letter-spacing:.02em}
-    #ip-netcheck.ok small{font-size:12px;opacity:.8}
+    #ip-netcheck.wait{justify-self:center;width:fit-content;background:none;color:#8d97a5;font-size:13px}
+    #ip-netcheck.wait::before{content:"";display:inline-block;width:10px;height:10px;margin-right:8px;
+      border-radius:50%;border:2px solid currentColor;border-right-color:transparent;vertical-align:-1px;
+      animation:ip-spin .8s linear infinite}
+    /* Safe: a pill that fits its text. It pops in, draws its check mark,
+       glints once, and opens to list what was checked. */
+    #ip-netcheck.ok{justify-self:center;width:fit-content;max-width:100%;padding:0;background:none;
+      display:flex;flex-direction:column;align-items:center;
+      border-radius:999px;animation:ip-pop .45s cubic-bezier(.2,1.4,.4,1) both}
+    #ip-netcheck .ip-safe{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:8px;
+      padding:7px 14px 7px 10px;border-radius:999px;border:1px solid rgba(13,189,139,.4);
+      background:rgba(13,189,139,.12);color:#0dbd8b;font:600 14px system-ui,sans-serif;cursor:pointer;
+      transition:background .2s,border-color .2s,transform .15s,box-shadow .2s}
+    #ip-netcheck .ip-safe:hover{background:rgba(13,189,139,.18);border-color:rgba(13,189,139,.7);
+      box-shadow:0 0 0 4px rgba(13,189,139,.12)}
+    #ip-netcheck .ip-safe:active{transform:scale(.96)}
+    #ip-netcheck .ip-safe:focus-visible{outline:2px solid #0dbd8b;outline-offset:2px}
+    #ip-netcheck .ip-safe::after{content:"";position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);
+      transform:translateX(-120%);animation:ip-glint 1.1s .55s ease-out both}
+    #ip-netcheck .ip-safe svg{flex:none;transition:transform .3s}
+    #ip-netcheck .ip-safe:hover svg{transform:rotate(-8deg) scale(1.1)}
+    #ip-netcheck .ip-safe .ip-check{stroke-dasharray:14;stroke-dashoffset:14;animation:ip-draw .4s .3s ease-out forwards}
+    #ip-netcheck .ip-safe-list li.ip-sub{color:#ebeef2;font-weight:500}
+    #ip-netcheck .ip-safe-list li.ip-sub::before{content:none}
+    #ip-netcheck.open .ip-safe-list li:nth-child(5){transition-delay:.2s}
+    #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
+    #ip-netcheck .ip-safe[aria-expanded=true] .ip-chev{transform:rotate(180deg)}
+    #ip-netcheck .ip-safe-list{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
+    #ip-netcheck .ip-safe-list > ul{overflow:hidden;margin:0;padding:0 6px;list-style:none;
+      color:#8d97a5;font-size:12.5px;line-height:1.5}
+    #ip-netcheck.open .ip-safe-list{grid-template-rows:1fr}
+    #ip-netcheck.open .ip-safe-list > ul{padding-top:8px}
+    #ip-netcheck .ip-safe-list li{opacity:0;transform:translateY(-4px);transition:opacity .25s,transform .25s}
+    #ip-netcheck.open .ip-safe-list li{opacity:1;transform:none}
+    #ip-netcheck.open .ip-safe-list li:nth-child(2){transition-delay:.05s}
+    #ip-netcheck.open .ip-safe-list li:nth-child(3){transition-delay:.1s}
+    #ip-netcheck.open .ip-safe-list li:nth-child(4){transition-delay:.15s}
+    #ip-netcheck .ip-safe-list li::before{content:"✓";color:#0dbd8b;margin-right:6px}
+    #ip-netcheck.bad{animation:ip-pop .35s ease-out both}
+    @keyframes ip-pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+    @keyframes ip-draw{to{stroke-dashoffset:0}}
+    @keyframes ip-glint{to{transform:translateX(120%)}}
+    @keyframes ip-spin{to{transform:rotate(360deg)}}
+    @media (prefers-reduced-motion:reduce){
+      #ip-netcheck,#ip-netcheck *,#ip-netcheck *::after,#ip-netcheck::before{animation:none!important;transition:none!important}
+      #ip-netcheck .ip-safe .ip-check{stroke-dashoffset:0}
+    }
     #ip-netcheck.bad{background:#a3121e;color:#fff}
     #ip-netcheck ul{margin:6px 0;padding-left:18px}
     #ip-netcheck a{color:inherit}
@@ -275,8 +330,39 @@
       href: "/chat/privacy.html#connection-check",
       target: "_blank",
       rel: "noopener",
-      textContent: "What this means",
+      textContent: t("whatThisMeans"),
     });
+  }
+
+  const SHIELD =
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z" fill="currentColor" fill-opacity=".15"/>' +
+    '<path class="ip-check" d="m8.5 12.2 2.4 2.4 4.6-4.8"/></svg>';
+
+  function safeBadge(box) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ip-safe";
+    btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = SHIELD;
+    btn.append(Object.assign(document.createElement("span"), { textContent: t("safe") }), Object.assign(document.createElement("span"), { className: "ip-chev", textContent: "▾", ariaHidden: "true" }));
+    btn.title = t("safeDetails");
+    const list = document.createElement("div");
+    list.className = "ip-safe-list";
+    const ul = document.createElement("ul");
+    ul.append(Object.assign(document.createElement("li"), { className: "ip-sub", textContent: t("safeSub") }));
+    for (const k of ["ok.network", "ok.leak", "ok.page", "ok.private"]) {
+      ul.append(Object.assign(document.createElement("li"), { textContent: t(k) }));
+    }
+    list.append(ul);
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const open = !box.classList.contains("open");
+      box.classList.toggle("open", open);
+      btn.setAttribute("aria-expanded", String(open));
+    };
+    box.replaceChildren(btn, list);
   }
 
   let homeRisk = null; // null until the check has finished
@@ -297,21 +383,13 @@
     box.dataset.state = state;
     box.className = state;
     if (state === "wait") {
-      box.textContent = "Checking your connection…";
+      box.textContent = t("checking");
     } else if (state === "ok") {
-      box.replaceChildren(
-        Object.assign(document.createElement("b"), { textContent: "🛡 Safe connection" }),
-        Object.assign(document.createElement("small"), { textContent: "No VPN, proxy, leaks or outside code found" }),
-      );
+      safeBadge(box);
     } else {
       const ul = document.createElement("ul");
-      for (const r of homeRisk) ul.append(Object.assign(document.createElement("li"), { textContent: "Your device " + window.IPNC.describe(r) }));
-      box.replaceChildren(
-        "Your connection may let others listen in:",
-        ul,
-        "You can still continue, but everyone in your call or chat will see this warning. ",
-        infoLink(),
-      );
+      for (const r of homeRisk) ul.append(Object.assign(document.createElement("li"), { textContent: window.IPNC.describe(r) }));
+      box.replaceChildren(t("riskTitle"), ul, t("riskContinue") + " ", infoLink());
     }
   }
   function waitForCheck() {
@@ -331,9 +409,9 @@
     const inCall = location.pathname.startsWith("/room") && document.querySelector("[data-testid=incall_leave]");
     const lines = [];
     if (inCall) {
-      for (const r of homeRisk || []) lines.push("You: your device " + window.IPNC.describe(r));
+      for (const r of homeRisk || []) lines.push(t("you") + ": " + window.IPNC.describe(r));
       for (const risks of window.IPCallRisks?.values() || []) {
-        for (const r of risks) lines.push("Someone in this call " + window.IPNC.describe(r));
+        for (const r of risks) lines.push(t("someoneInCall") + ": " + window.IPNC.describe(r));
       }
     }
     if (!lines.length) {
@@ -352,7 +430,7 @@
     box.dataset.key = key;
     const ul = document.createElement("ul");
     for (const l of lines) ul.append(Object.assign(document.createElement("li"), { textContent: l }));
-    box.replaceChildren("⚠ Connection warning: others may be able to listen in. ", infoLink(), ul);
+    box.replaceChildren(t("warnBar") + " ", infoLink(), ul);
   }
   window.addEventListener("ip-call-risks", showCallRisks);
 
@@ -429,12 +507,11 @@
     }
     if (!c) {
       badge.className = "bad";
-      badge.textContent = "Warning: this call link has no password, so the call is NOT end-to-end encrypted";
+      badge.textContent = t("noPassword");
       return;
     }
     badge.className = "";
-    badge.title =
-      "Compare this code with everyone in the call. If you all see the same digits, you all share the same encryption key.";
+    badge.title = t("safetyTitle");
     safetyCode(c.password, c.roomId).then((code) => {
       if (safetyFor !== key) return;
       const how = Object.assign(document.createElement("a"), {
@@ -442,9 +519,9 @@
         target: "_blank",
         rel: "noopener",
         textContent: "?",
-        title: "What this means and how to check it",
+        title: t("safetyHow"),
       });
-      badge.replaceChildren("Safety code ", Object.assign(document.createElement("b"), { textContent: code }), " ", how);
+      badge.replaceChildren(t("safetyCode") + " ", Object.assign(document.createElement("b"), { textContent: code }), " ", how);
     });
   }
 

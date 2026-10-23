@@ -89,7 +89,7 @@ else bad("config.json differs from config/element-call.json");
 for (const k of ["posthog", "sentry", "rageshake", "opentelemetry"]) {
   if (k in cfg) bad(`config.json enables ${k}`);
 }
-for (const f of ["index.html", "app.js", "style.css", "inject.js", "guard.js", "kx.js", "netcheck.js", "iplists.txt", "privacy.html"]) {
+for (const f of ["index.html", "app.js", "style.css", "inject.js", "guard.js", "kx.js", "i18n.js", "netcheck.js", "iplists.txt", "privacy.html"]) {
   const { body } = await get(`/chat/${f === "index.html" ? "" : f}`);
   if (body.equals(local(`chat/public/${f}`))) ok(`/chat/${f} matches chat/public/${f}`);
   else bad(`/chat/${f} differs from chat/public/${f}`);
