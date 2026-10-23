@@ -282,12 +282,15 @@
     #ip-netcheck .ip-safe svg{flex:none;transition:transform .3s}
     #ip-netcheck .ip-safe:hover svg{transform:rotate(-8deg) scale(1.1)}
     #ip-netcheck .ip-safe .ip-check{stroke-dasharray:14;stroke-dashoffset:14;animation:ip-draw .4s .3s ease-out forwards}
-    /* A green shine sweeps across the summary line each time it opens. */
-    #ip-netcheck .ip-safe-list li.ip-sub{color:transparent;font-weight:500;
-      background:linear-gradient(100deg,#ebeef2 0 42%,#5ef2c4 50%,#ebeef2 58% 100%) 100% 0/250% 100%;
-      -webkit-background-clip:text;background-clip:text}
-    #ip-netcheck.open .ip-safe-list li.ip-sub{animation:ip-shine 1.3s .25s ease-in-out both}
-    @keyframes ip-shine{from{background-position:100% 0}to{background-position:0 0}}
+    /* Summary line: an aurora of greens and teals that keeps flowing
+       through the text, with a soft breathing glow. */
+    #ip-netcheck .ip-safe-list li.ip-sub{color:transparent;font-weight:600;letter-spacing:.01em;
+      background:linear-gradient(90deg,#0dbd8b,#5ef2c4,#38d9f5,#9cf5a8,#0dbd8b) 0 0/300% 100%;
+      -webkit-background-clip:text;background-clip:text;
+      animation:ip-aurora 4s linear infinite,ip-breathe 2.4s ease-in-out infinite}
+    @keyframes ip-aurora{to{background-position:300% 0}}
+    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 0 rgba(94,242,196,0))}
+      50%{filter:drop-shadow(0 0 6px rgba(94,242,196,.55))}}
     #ip-netcheck .ip-safe-list li.ip-sub::before{content:none}
     #ip-netcheck.open .ip-safe-list li:nth-child(5){transition-delay:.2s}
     #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
