@@ -282,29 +282,39 @@
     #ip-netcheck .ip-safe svg{flex:none;transition:transform .3s}
     #ip-netcheck .ip-safe:hover svg{transform:rotate(-8deg) scale(1.1)}
     #ip-netcheck .ip-safe .ip-check{stroke-dasharray:14;stroke-dashoffset:14;animation:ip-draw .4s .3s ease-out forwards}
-    /* Summary line: white and cool silver-blue drifting slowly through the
-       text, with a faint breathing glow. */
+    /* Summary line: pale mint, with a slow shine (a deeper mint core
+       inside a lighter halo) passing through, and a faint breathing glow. */
     #ip-netcheck .ip-safe-list li.ip-sub{color:transparent;font-weight:600;letter-spacing:.01em;
-      background:linear-gradient(90deg,#ffffff,#b9c7d8,#8fa6c1,#dfe6ee,#ffffff) 0 0/300% 100%;
+      background:linear-gradient(90deg,#e1fff6 0 38%,#f2fffb 45%,#b2ffe8 50%,#f2fffb 55%,#e1fff6 62% 100%) 100% 0/300% 100%;
       -webkit-background-clip:text;background-clip:text;
-      animation:ip-aurora 14s linear infinite,ip-breathe 7s ease-in-out infinite}
-    @keyframes ip-aurora{to{background-position:300% 0}}
-    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
-      50%{filter:drop-shadow(0 0 3px rgba(200,215,235,.3))}}
+      animation:ip-aurora 9s ease-in-out infinite,ip-breathe 7s ease-in-out infinite}
+    @keyframes ip-aurora{to{background-position:0 0}}
+    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 0 rgba(178,255,232,0))}
+      50%{filter:drop-shadow(0 0 3px rgba(178,255,232,.3))}}
     #ip-netcheck .ip-safe-list li.ip-sub::before{content:none}
-    #ip-netcheck.open .ip-safe-list li:nth-child(5){transition-delay:.2s}
     #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
     #ip-netcheck .ip-safe[aria-expanded=true] .ip-chev{transform:rotate(180deg)}
-    #ip-netcheck .ip-safe-list{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
+    /* Opening: the box grows, then the lines fade in top to bottom.
+       Closing: the lines fade out bottom to top first, and the box only
+       starts shrinking (slowly at first) once they're nearly gone, so no
+       line is ever cut off while still visible. */
+    #ip-netcheck .ip-safe-list{display:grid;grid-template-rows:0fr;
+      transition:grid-template-rows .6s cubic-bezier(.55,0,.75,.2) .18s}
     #ip-netcheck .ip-safe-list > ul{overflow:hidden;margin:0;padding:0 6px;list-style:none;text-align:center;
-      color:#8d97a5;font-size:12.5px;line-height:1.5;transition:padding-top .3s ease}
-    #ip-netcheck.open .ip-safe-list{grid-template-rows:1fr}
-    #ip-netcheck.open .ip-safe-list > ul{padding-top:8px}
-    #ip-netcheck .ip-safe-list li{opacity:0;transform:translateY(-4px);transition:opacity .25s,transform .25s}
-    #ip-netcheck.open .ip-safe-list li{opacity:1;transform:none}
-    #ip-netcheck.open .ip-safe-list li:nth-child(2){transition-delay:.05s}
-    #ip-netcheck.open .ip-safe-list li:nth-child(3){transition-delay:.1s}
-    #ip-netcheck.open .ip-safe-list li:nth-child(4){transition-delay:.15s}
+      color:#8d97a5;font-size:12.5px;line-height:1.5;transition:padding-top .6s cubic-bezier(.55,0,.75,.2) .18s}
+    #ip-netcheck.open .ip-safe-list{grid-template-rows:1fr;transition:grid-template-rows .55s cubic-bezier(.2,.7,.3,1)}
+    #ip-netcheck.open .ip-safe-list > ul{padding-top:8px;transition:padding-top .55s cubic-bezier(.2,.7,.3,1)}
+    #ip-netcheck .ip-safe-list li{opacity:0;transform:translateY(-4px);transition:opacity .16s ease-in,transform .16s ease-in}
+    #ip-netcheck .ip-safe-list li:nth-child(4){transition-delay:.04s}
+    #ip-netcheck .ip-safe-list li:nth-child(3){transition-delay:.08s}
+    #ip-netcheck .ip-safe-list li:nth-child(2){transition-delay:.12s}
+    #ip-netcheck .ip-safe-list li:nth-child(1){transition-delay:.16s}
+    #ip-netcheck.open .ip-safe-list li{opacity:1;transform:none;transition:opacity .3s ease-out,transform .3s ease-out}
+    #ip-netcheck.open .ip-safe-list li:nth-child(1){transition-delay:.12s}
+    #ip-netcheck.open .ip-safe-list li:nth-child(2){transition-delay:.18s}
+    #ip-netcheck.open .ip-safe-list li:nth-child(3){transition-delay:.24s}
+    #ip-netcheck.open .ip-safe-list li:nth-child(4){transition-delay:.3s}
+    #ip-netcheck.open .ip-safe-list li:nth-child(5){transition-delay:.36s}
     #ip-netcheck .ip-safe-list li::before{content:"✓";color:#0dbd8b;margin-right:6px}
     #ip-netcheck.bad{animation:ip-pop .35s ease-out both}
     @keyframes ip-pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
