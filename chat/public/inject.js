@@ -282,22 +282,22 @@
     #ip-netcheck .ip-safe svg{flex:none;transition:transform .3s}
     #ip-netcheck .ip-safe:hover svg{transform:rotate(-8deg) scale(1.1)}
     #ip-netcheck .ip-safe .ip-check{stroke-dasharray:14;stroke-dashoffset:14;animation:ip-draw .4s .3s ease-out forwards}
-    /* Summary line: an aurora of greens and teals that keeps flowing
-       through the text, with a soft breathing glow. */
+    /* Summary line: white and cool silver-blue drifting slowly through the
+       text, with a faint breathing glow. */
     #ip-netcheck .ip-safe-list li.ip-sub{color:transparent;font-weight:600;letter-spacing:.01em;
-      background:linear-gradient(90deg,#0dbd8b,#5ef2c4,#38d9f5,#9cf5a8,#0dbd8b) 0 0/300% 100%;
+      background:linear-gradient(90deg,#ffffff,#b9c7d8,#8fa6c1,#dfe6ee,#ffffff) 0 0/300% 100%;
       -webkit-background-clip:text;background-clip:text;
-      animation:ip-aurora 4s linear infinite,ip-breathe 2.4s ease-in-out infinite}
+      animation:ip-aurora 14s linear infinite,ip-breathe 7s ease-in-out infinite}
     @keyframes ip-aurora{to{background-position:300% 0}}
-    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 0 rgba(94,242,196,0))}
-      50%{filter:drop-shadow(0 0 6px rgba(94,242,196,.55))}}
+    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
+      50%{filter:drop-shadow(0 0 3px rgba(200,215,235,.3))}}
     #ip-netcheck .ip-safe-list li.ip-sub::before{content:none}
     #ip-netcheck.open .ip-safe-list li:nth-child(5){transition-delay:.2s}
     #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
     #ip-netcheck .ip-safe[aria-expanded=true] .ip-chev{transform:rotate(180deg)}
     #ip-netcheck .ip-safe-list{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
     #ip-netcheck .ip-safe-list > ul{overflow:hidden;margin:0;padding:0 6px;list-style:none;text-align:center;
-      color:#8d97a5;font-size:12.5px;line-height:1.5}
+      color:#8d97a5;font-size:12.5px;line-height:1.5;transition:padding-top .3s ease}
     #ip-netcheck.open .ip-safe-list{grid-template-rows:1fr}
     #ip-netcheck.open .ip-safe-list > ul{padding-top:8px}
     #ip-netcheck .ip-safe-list li{opacity:0;transform:translateY(-4px);transition:opacity .25s,transform .25s}
