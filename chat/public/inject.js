@@ -248,7 +248,10 @@
   const NC_STYLE = `
     #ip-netcheck{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:8px;
       font:14px/1.4 system-ui,sans-serif;background:rgba(127,127,127,.12)}
-    #ip-netcheck.ok{color:#0dbd8b}
+    #ip-netcheck.ok{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;
+      color:#0dbd8b;background:rgba(13,189,139,.1);border:1px solid rgba(13,189,139,.35)}
+    #ip-netcheck.ok b{font-size:15px;font-weight:600;letter-spacing:.02em}
+    #ip-netcheck.ok small{font-size:12px;opacity:.8}
     #ip-netcheck.bad{background:#a3121e;color:#fff}
     #ip-netcheck ul{margin:6px 0;padding-left:18px}
     #ip-netcheck a{color:inherit}
@@ -296,7 +299,10 @@
     if (state === "wait") {
       box.textContent = "Checking your connection…";
     } else if (state === "ok") {
-      box.textContent = "✓ Connection check passed";
+      box.replaceChildren(
+        Object.assign(document.createElement("b"), { textContent: "🛡 Safe connection" }),
+        Object.assign(document.createElement("small"), { textContent: "No VPN, proxy, leaks or outside code found" }),
+      );
     } else {
       const ul = document.createElement("ul");
       for (const r of homeRisk) ul.append(Object.assign(document.createElement("li"), { textContent: "Your device " + window.IPNC.describe(r) }));
