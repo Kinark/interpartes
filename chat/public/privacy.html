@@ -27,6 +27,22 @@
           chat opens, so it doesn't stay in your browser history. The server relays ciphertext, never stores it, and forgets a chat room the moment
           the last person leaves.
         </li>
+        <li>
+          <strong>Closing a chat for everyone.</strong> In a chat-only room anyone can press
+          "Close for all": everyone is disconnected, the messages disappear from every screen, and
+          the link stops working. To keep it closed, the server remembers the room's opaque tag (not
+          the key) in memory for 24 hours.
+        </li>
+        <li>
+          <strong>Amnesia rooms.</strong> Only the last 5 messages of each person stay on screen;
+          older ones are deleted. This happens in each participant's browser, so it can't stop
+          someone with a modified browser or a camera from keeping more.
+        </li>
+        <li>
+          <strong>Watermark.</strong> Every chat is covered in faint small "anonymous chat" text, so
+          any screenshot or recording of it says it was private. A screenshot without it did not
+          come from a real chat here.
+        </li>
       </ul>
 
       <h2>What the server does see, and for how long</h2>

@@ -12,6 +12,12 @@ const MAX_CONNECTIONS = 5_000;
 const RATE_PER_SEC = 5;
 const RATE_BURST = 20;
 const JOIN_TIMEOUT_MS = 10_000;
+// A chat-only room closed by one of its members stays closed this long, so
+// clients reconnecting (or anyone opening the link later) can't reopen it.
+// Only the opaque tag is kept, in memory; a restart forgets it.
+const CLOSED_TTL_MS = 24 * 60 * 60_000;
+const MAX_CLOSED = 20_000;
+const CLOSE_FRAME = '{"t":"close"}';
 
 const TAG_RE = /^[0-9a-f]{64}$/;
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -23,8 +29,30 @@ interface Peer {
   last: number;
 }
 
-const rooms = new Map<string, Map<string, Peer>>();
+interface Room {
+  peers: Map<string, Peer>;
+  // Set by whoever opens the room. Only chat-only rooms are closable; call
+  // key exchanges and call side chats are not.
+  closable: boolean;
+}
+
+const rooms = new Map<string, Room>();
+const closedTags = new Map<string, number>(); // tag -> expiry
 let connections = 0;
+
+function isClosed(tag: string): boolean {
+  const exp = closedTags.get(tag);
+  if (exp === undefined) return false;
+  if (exp > Date.now()) return true;
+  closedTags.delete(tag);
+  return false;
+}
+
+function markClosed(tag: string): void {
+  closedTags.delete(tag);
+  closedTags.set(tag, Date.now() + CLOSED_TTL_MS);
+  while (closedTags.size > MAX_CLOSED) closedTags.delete(closedTags.keys().next().value!);
+}
 
 function randomId(): string {
   const b = new Uint8Array(8);
@@ -36,9 +64,9 @@ function send(ws: WebSocket, msg: unknown): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
-function broadcast(room: Map<string, Peer>, except: string, msg: unknown): void {
+function broadcast(room: Room, except: string, msg: unknown): void {
   const s = JSON.stringify(msg);
-  for (const p of room.values()) {
+  for (const p of room.peers.values()) {
     if (p.id !== except && p.ws.readyState === WebSocket.OPEN) p.ws.send(s);
   }
 }
@@ -79,25 +107,41 @@ function handleSocket(ws: WebSocket): void {
         ws.close(4001, "bad join");
         return;
       }
+      if (isClosed(t)) {
+        ws.close(4004, "closed");
+        return;
+      }
       let room = rooms.get(t);
       if (!room) {
         if (rooms.size >= MAX_ROOMS) {
           ws.close(4003, "server full");
           return;
         }
-        room = new Map();
+        room = { peers: new Map(), closable: (join as { closable?: unknown }).closable === true };
         rooms.set(t, room);
       }
-      if (room.size >= MAX_PEERS_PER_ROOM) {
+      if (room.peers.size >= MAX_PEERS_PER_ROOM) {
         ws.close(4003, "room full");
         return;
       }
       clearTimeout(joinTimer);
       tag = t;
       peer = { id: randomId(), ws, tokens: RATE_BURST, last: Date.now() };
-      room.set(peer.id, peer);
-      send(ws, { t: "ready", id: peer.id, n: room.size });
-      broadcast(room, peer.id, { t: "j", f: peer.id, n: room.size });
+      room.peers.set(peer.id, peer);
+      send(ws, { t: "ready", id: peer.id, n: room.peers.size });
+      broadcast(room, peer.id, { t: "j", f: peer.id, n: room.peers.size });
+      return;
+    }
+    if (ev.data === CLOSE_FRAME) {
+      // Any member of a chat-only room may close it for everyone: tell the
+      // others who did it, disconnect everyone and refuse the tag from now on.
+      const room = rooms.get(tag!);
+      if (!room?.closable) return;
+      const t = tag!;
+      broadcast(room, peer.id, { t: "x", f: peer.id });
+      markClosed(t);
+      rooms.delete(t);
+      for (const p of room.peers.values()) p.ws.close(4004, "closed");
       return;
     }
     if (!B64_RE.test(ev.data)) {
@@ -116,9 +160,9 @@ function handleSocket(ws: WebSocket): void {
     clearTimeout(joinTimer);
     if (peer && tag) {
       const room = rooms.get(tag);
-      if (room?.delete(peer.id)) {
-        if (room.size === 0) rooms.delete(tag);
-        else broadcast(room, peer.id, { t: "l", f: peer.id, n: room.size });
+      if (room?.peers.delete(peer.id)) {
+        if (room.peers.size === 0) rooms.delete(tag);
+        else broadcast(room, peer.id, { t: "l", f: peer.id, n: room.peers.size });
       }
     }
     peer = null;

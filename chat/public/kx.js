@@ -84,7 +84,9 @@
 
   // opts: secret, roomId, scope ("call" | "chat"), meta (sent to others),
   // onKey(index, bytes) for every new 32-byte key, onMessage(relayId, obj),
-  // onPeer(relayId, meta, isUpdate), onLeave(relayId), onStatus({ connected, n, keyed })
+  // onPeer(relayId, meta, isUpdate), onLeave(relayId), onStatus({ connected, n, keyed }),
+  // closable (any member may close the room for everyone; chat-only rooms),
+  // onClosed(relayId of whoever closed it, or null if not known)
   function session(opts) {
     const scope = opts.scope;
     const secret = opts.secret;
@@ -104,6 +106,7 @@
     const groupKeys = new Map(); // index -> AES key (chat messages)
     const seen = new Set();
     const pendingKeyMsgs = [];
+    let closedBy = null;
 
     const ready = (async () => {
       const s = enc.encode(secret);
@@ -203,6 +206,11 @@
     }
 
     async function onFrame(msg) {
+      if (msg.t === "x") {
+        // The relay closes every socket right after this (code 4004).
+        closedBy = typeof msg.f === "string" ? msg.f : null;
+        return;
+      }
       if (msg.t === "ready" || msg.t === "j" || msg.t === "l") {
         relayN = msg.n;
         if (msg.t === "ready") {
@@ -267,7 +275,7 @@
       if (closed) return;
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}/chat/ws`);
-      ws.onopen = () => ws.send(JSON.stringify({ join: tag }));
+      ws.onopen = () => ws.send(JSON.stringify(opts.closable ? { join: tag, closable: true } : { join: tag }));
       ws.onmessage = (ev) => {
         let msg;
         try {
@@ -278,6 +286,13 @@
         onFrame(msg).catch(() => {});
       };
       ws.onclose = (ev) => {
+        if (ev.code === 4004 && !closed) {
+          // Room closed for everyone: by someone here just now, or earlier.
+          const by = closedBy;
+          shutdown();
+          opts.onClosed?.(by);
+          return;
+        }
         for (const id of peers.keys()) opts.onLeave?.(id);
         peers.clear();
         relayN = 0;
@@ -290,6 +305,15 @@
         setTimeout(connect, Math.min(30_000, 1000 * 2 ** retry++));
       };
     }
+    function shutdown() {
+      closed = true;
+      clearTimeout(rekeyTimer);
+      ws?.close();
+      peers.clear();
+      groupKeys.clear();
+      wrapKeys.clear();
+    }
+
     connect();
 
     return {
@@ -304,13 +328,14 @@
         opts.meta = meta;
         if (relayN > 0) sendPub().catch(() => {});
       },
-      close() {
-        closed = true;
-        clearTimeout(rekeyTimer);
-        ws?.close();
-        peers.clear();
-        groupKeys.clear();
-        wrapKeys.clear();
+      close: shutdown,
+      // Closable rooms only: ends the room for everyone (the relay
+      // disconnects all members and refuses the room from then on).
+      closeForEveryone() {
+        if (!opts.closable || !ws || ws.readyState !== WebSocket.OPEN) return false;
+        ws.send('{"t":"close"}');
+        shutdown();
+        return true;
       },
     };
   }

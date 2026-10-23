@@ -10,6 +10,14 @@
     return;
   }
   const t = window.IPI18N.t;
+
+  // Video tiles: no "Profile" item in the "…" menu (and the same right-click
+  // menu). Matched by its icon (Compound's UserProfileIcon), so it works in
+  // every language Element Call is shown in.
+  const tileMenuStyle = document.createElement("style");
+  tileMenuStyle.textContent = '[role=menuitem]:has(path[d^="M9.175 13.825"]){display:none!important}';
+  document.head.append(tileMenuStyle);
+
   const ICON =
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8.4l-3.7 3.2A1 1 0 0 1 3 20.4V6a2 2 0 0 1 2-2Zm1 2v12.2L7.6 16H20V6H5Zm2 3h10v2H7V9Zm0 3h7v2H7v-2Z"/></svg>';
@@ -132,9 +140,9 @@
     leave.before(btn);
   }
 
-  // Home page layout:   New Room
-  //                      [Nickname]
-  //                    <Call>  <Chat>
+  // Home page layout:        New Room
+  //                          [Nickname]
+  //                    <Call> <Chat> <Amnesia>
   // Done with CSS over Element Call's own form so its logic stays intact.
   // There is no room name: Element Call's field is hidden and filled with a
   // random value (see fillRoomName), so no name ever reaches the server.
@@ -142,8 +150,8 @@
     main:has([data-testid=home_go]){flex:1;display:flex;flex-direction:column;
       align-items:center;justify-content:center;padding-block:24px}
     main:has([data-testid=home_go]) h1{text-align:center;margin:0 0 24px}
-    form:has([data-testid=home_go]){display:grid;grid-template-columns:1fr 1fr;
-      column-gap:12px;row-gap:24px;width:min(360px,calc(100vw - 32px));align-items:center}
+    form:has([data-testid=home_go]){display:grid;grid-template-columns:1fr 1fr 1fr;
+      column-gap:10px;row-gap:24px;width:min(380px,calc(100vw - 32px));align-items:center}
     form:has([data-testid=home_go]) > *{margin:0!important}
     form:has([data-testid=home_go]) > div:has([data-testid=home_callName]):not(:has([data-testid=home_go])),
     form:has([data-testid=home_go]) div:has(> [data-testid=home_callName]){display:none!important}
@@ -155,9 +163,7 @@
     main:has([data-testid=home_go]) [class*=_callList_]{display:none!important}
     form:has([data-testid=home_go]) > :has([data-testid=home_displayName]){grid-column:1/-1}
     form:has([data-testid=home_go]) > p{display:none}
-    form button[data-testid=home_go][type=submit],form #ip-chatonly-btn{width:auto!important;min-width:0!important;padding-inline:28px!important}
-    form button[data-testid=home_go][type=submit]{justify-self:end}
-    form #ip-chatonly-btn{justify-self:start}
+    form button[data-testid=home_go][type=submit],form #ip-chatonly-btn,form #ip-amnesia-btn{width:100%!important;min-width:0!important;padding-inline:12px!important;justify-self:stretch}
   `;
 
   const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
@@ -217,18 +223,26 @@
     }
   }
 
-  // Home page: a "Chat" button beside "Call" that starts a text-only room
-  // with the same nickname, without creating a call.
+  // Home page: "Chat" and "Amnesia" buttons beside "Call" that start a
+  // text-only room with the same nickname, without creating a call. Amnesia
+  // rooms only keep each person's last few messages (see app.js).
   function addChatOnlyButton() {
     const go = document.querySelector("[data-testid=home_go]");
     if (!go || document.getElementById("ip-chatonly-btn")) return;
+    const chat = chatOnlyButton(go, "ip-chatonly-btn", t("chat"), false);
+    const amnesia = chatOnlyButton(go, "ip-amnesia-btn", t("amnesia"), true);
+    amnesia.title = t("amnesiaTitle");
+    go.after(chat, amnesia);
+  }
+
+  function chatOnlyButton(go, id, label, amnesia) {
     const btn = document.createElement("button");
-    btn.id = "ip-chatonly-btn";
+    btn.id = id;
     btn.type = "button";
     btn.className = go.className;
-    btn.dataset.kind = "primary";
+    btn.dataset.kind = amnesia ? "secondary" : "primary";
     btn.dataset.size = go.dataset.size || "lg";
-    btn.textContent = t("chat");
+    btn.textContent = label;
     btn.onclick = (e) => {
       e.preventDefault();
       const nameInput = document.querySelector("[data-testid=home_displayName]");
@@ -243,14 +257,14 @@
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=+$/, "");
-      const p = new URLSearchParams({ k: secret });
+      const p = new URLSearchParams(amnesia ? { k: secret, a: "1" } : { k: secret });
       // Handed to the chat page once; it deletes it as soon as it reads it.
       if (nameInput?.value.trim()) {
         sessionStorage.setItem("interpartes-chat-handoff", nameInput.value.trim().slice(0, 40));
       }
       location.assign(`/chat/#${p}`);
     };
-    go.after(btn);
+    return btn;
   }
 
   // Connection check (netcheck.js, started by guard.js). The home page shows

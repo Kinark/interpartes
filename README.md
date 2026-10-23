@@ -131,13 +131,17 @@ by earlier versions. Element Call's "Your call has ended / How did it
 go?" screen is never shown: `guard.js` hides it and goes straight to the home
 page.
 
+No profile menu: `inject.js` hides the "Profile" item in each video tile's
+"…" (and right-click) menu, matched by its icon so it works in every
+language.
+
 No room names: `inject.js` hides Element Call's "Name of call" field and fills
 it with 24 random hex characters for every call, so the server and the link
 only ever see a random name.
 
 ## Chat (`/chat`)
 `chat/server.ts` is a tiny WebSocket relay; `chat/public/` is the web page.
-- **Chat-only rooms**: the home page (restyled by `inject.js` to "New Room / [Nickname] / Call · Chat", centered) has a "Chat" button next to "Call".
+- **Chat-only rooms**: the home page (restyled by `inject.js` to "New Room / [Nickname] / Call · Chat · Amnesia", centered) has a "Chat" button next to "Call".
   It uses the same nickname but creates no call (and no Matrix room or
   account): it opens `/chat/#k=<secret>`. The creator joins straight away;
   people opening the link enter a display name. Nicknames are never
@@ -156,6 +160,23 @@ only ever see a random name.
   sees an opaque room tag and ciphertext, keeps nothing on disk or in logs, and
   forgets a room the moment its last socket closes. No history: you see only
   messages sent while you're connected.
+- **Amnesia rooms**: a third home page button, "Amnesia", opens a chat-only
+  room (`/chat/#k=<secret>&a=1`) where each browser keeps only the last 5
+  messages of each person on screen and removes older ones. The flag is mixed
+  into the key derivation (room id `amnesia`), so removing it from the link
+  opens a different, empty room rather than the same room without the limit.
+  This is enforced by the participants' browsers, so a modified client could
+  keep more.
+- **Close for all**: in chat-only rooms (regular and Amnesia, not a call's
+  side chat) anyone can end the room for everyone. The relay tells the
+  others who closed it, disconnects everyone, wipes their screens, and
+  refuses that room tag for 24 h (kept in memory only, gone on restart), so
+  the link stops working. Rooms opt in when they're created
+  (`{join, closable: true}`); the call key exchange never does.
+- **Watermark**: every chat (chat-only and in-call) is overlaid with faint,
+  closely spaced diagonal lines of small "ANONYMOUS CHAT" text, in the
+  viewer's language, so any screenshot or recording of a chat says it was
+  private. It is drawn in the browser and never sent anywhere.
 - Limits: text only, 4000 chars, 5 msg/s per person, 100 people per room;
   only same-origin WebSocket connections accepted.
 - Loaded into Element Call by `config/index.html` (`/chat/inject.js`); it

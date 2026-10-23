@@ -16,6 +16,7 @@
           <input id="name" maxlength="40" autocomplete="off" required />
         </label>
         <button id="join-go" type="submit">Start</button>
+        <p id="amnesia-hint" class="hint" hidden></p>
         <p class="hint">
           <span data-i18n="hint">End-to-end encrypted. Nothing is stored: when the last person leaves, the chat is gone.</span>
           <a href="/chat/privacy.html" data-i18n="howToCheck">How to check</a>
@@ -27,6 +28,7 @@
       <header>
         <span class="heading">
           <span id="status" data-i18n="connecting">Connecting…</span>
+          <span id="amnesia-tag" class="tag" data-i18n="amnesia" hidden>Amnesia</span>
           <span
             class="safety"
             data-i18n-title="safetyTitleChat"
@@ -36,6 +38,7 @@
         </span>
         <span class="actions">
           <button id="copy" type="button" data-i18n="copyLink">Copy link</button>
+          <button id="close-all" type="button" class="danger" data-i18n="closeAll" data-i18n-title="closeAllTitle" hidden>Close for all</button>
           <button id="leave" type="button" data-i18n="leave">Leave</button>
         </span>
       </header>
@@ -49,6 +52,7 @@
         <textarea id="text" rows="1" maxlength="4000" placeholder="Message" data-i18n-placeholder="message" autocomplete="off"></textarea>
         <button type="submit" data-i18n="send">Send</button>
       </form>
+      <div id="watermark" aria-hidden="true" hidden></div>
     </section>
 
     <script src="/chat/i18n.js"></script>

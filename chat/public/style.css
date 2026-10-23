@@ -99,9 +99,38 @@ textarea:focus {
 }
 
 #chat {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
+}
+
+/* Above everything (so screenshots of any part carry it), but never in the
+   way: it doesn't take clicks or text selection. Oversized so the rotated
+   layer still covers every corner. */
+#watermark {
+  position: absolute;
+  inset: -50%;
+  z-index: 10;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.045;
+  background-repeat: repeat;
+  transform: rotate(-24deg);
+}
+
+.tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid #b388ff;
+  color: #d4bfff;
+  font-size: 12px;
+}
+
+header button.danger {
+  border-color: #a3121e;
+  color: #ff8a93;
 }
 
 #chat header {

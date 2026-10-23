@@ -2,6 +2,7 @@
 
 // Link formats (everything after # stays in the browser):
 //   /chat/#k=<secret>                 standalone chat
+//   /chat/#k=<secret>&a=1             standalone Amnesia chat (see AMNESIA_KEEP)
 //   /chat/#r=<roomId>&k=<password>    chat for an Element Call room
 // The secret authenticates a fresh ECDH group key exchange (see kx.js), so the
 // relay only ever sees an opaque room tag and AES-GCM ciphertext, and a link
@@ -10,6 +11,11 @@
 const MAX_TEXT = 4000;
 const t = IPI18N.t;
 const MAX_NAME = 40;
+// Amnesia rooms: only each person's last few messages stay on screen; older
+// ones are removed from the page. The mode is part of the key derivation
+// (see cryptoRoomId), so a link with the flag removed opens a different room
+// instead of the same one without the limit.
+const AMNESIA_KEEP = 5;
 // One-shot nickname from the home page's "Chat" button (see inject.js).
 const HANDOFF_KEY = "interpartes-chat-handoff";
 
@@ -53,11 +59,26 @@ async function safetyCode(base, salt) {
 
 function parseHashOnce() {
   const p = new URLSearchParams(location.hash.slice(1));
+  const roomId = p.get("r");
   return {
     secret: p.get("k"),
-    roomId: p.get("r"),
+    roomId,
     embedded: p.get("e") === "1",
+    // Call chats are always regular chats.
+    amnesia: !roomId && p.get("a") === "1",
   };
+}
+
+// Chat-only rooms (not a call's side chat): anyone in them can close the
+// room for everyone.
+const CHAT_ONLY = !LINK.roomId && !LINK.embedded;
+
+function cryptoRoomId(roomId, amnesia) {
+  return roomId || (amnesia ? "amnesia" : "");
+}
+
+function linkParams(secret, amnesia) {
+  return new URLSearchParams(amnesia ? { k: secret, a: "1" } : { k: secret });
 }
 
 function cleanName(s) {
@@ -72,7 +93,7 @@ function clock(ts) {
 
 const log = $("log");
 
-function addLine(kind, parts) {
+function addLine(kind, parts, sender) {
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   const li = document.createElement("li");
   li.className = kind;
@@ -83,7 +104,23 @@ function addLine(kind, parts) {
     li.append(span);
   }
   log.append(li);
+  if (sender) forgetOld(sender, li);
   if (atBottom || kind === "mine") log.scrollTop = log.scrollHeight;
+}
+
+// Amnesia: keep each person's last AMNESIA_KEEP messages, remove the rest
+// from the page (the text only ever lived in these elements).
+const kept = new Map(); // sender ("me" or relay id) -> [li, ...]
+function forgetOld(sender, li) {
+  if (!LINK.amnesia) return;
+  const list = kept.get(sender) || [];
+  list.push(li);
+  kept.set(sender, list);
+  while (list.length > AMNESIA_KEEP) {
+    const old = list.shift();
+    for (const s of old.querySelectorAll(".text")) s.textContent = "";
+    old.remove();
+  }
 }
 
 function notice(text) {
@@ -126,6 +163,7 @@ function showRisks() {
 }
 
 function onStatus(s) {
+  if (roomClosed) return;
   if (s.full) return setStatus(t("full"), false);
   if (!s.connected) return setStatus(t("disconnected"), false);
   if (!s.keyed) return setStatus(t("securing"), false);
@@ -136,31 +174,93 @@ function onMessage(from, m) {
   if (typeof m.x !== "string" || typeof m.ts !== "number") return;
   const n = cleanName(m.n) || peerName(from);
   names.set(from, n);
-  addLine("theirs", [
-    ["who", n],
-    ["when", clock(m.ts)],
-    ["text", m.x.slice(0, MAX_TEXT)],
-  ]);
+  addLine(
+    "theirs",
+    [
+      ["who", n],
+      ["when", clock(m.ts)],
+      ["text", m.x.slice(0, MAX_TEXT)],
+    ],
+    from,
+  );
   if (EMBEDDED) {
     window.parent.postMessage({ interpartesChat: "unread" }, location.origin);
   }
 }
 
+// Watermark: small, faint, closely spaced diagonal lines of "ANONYMOUS CHAT"
+// over the whole chat, so any screenshot or recording of it says it was
+// private. Drawn on a canvas and set as a data: background (allowed by the
+// CSP), never sent anywhere. The element is rotated by CSS, so the tile
+// itself stays horizontal and seamless.
+function startWatermark() {
+  const el = $("watermark");
+  const draw = () => {
+    const ratio = window.devicePixelRatio || 1;
+    const sep = "   ·   ";
+    const phrase = t("wm.anon") + sep;
+    const font = "600 10px Inter, system-ui, sans-serif";
+    const rowH = 22;
+    const c = document.createElement("canvas");
+    const g0 = c.getContext("2d");
+    g0.font = font;
+    const w = Math.ceil(g0.measureText(phrase).width);
+    const h = rowH * 2;
+    c.width = w * ratio;
+    c.height = h * ratio;
+    const g = c.getContext("2d");
+    g.scale(ratio, ratio);
+    g.font = font;
+    g.textBaseline = "middle";
+    g.fillStyle = "#fff";
+    // Two rows per tile, the second shifted by half a phrase (brick pattern).
+    g.fillText(phrase, 0, rowH / 2);
+    g.fillText(phrase, -w / 2, rowH * 1.5);
+    g.fillText(phrase, w / 2, rowH * 1.5);
+    el.style.backgroundImage = `url(${c.toDataURL("image/png")})`;
+    el.style.backgroundSize = `${w}px ${h}px`;
+  };
+  draw();
+  el.hidden = false;
+}
+
+// Ends the chat on this screen: messages are wiped, only a notice remains.
+let roomClosed = false;
+function showClosed(text) {
+  roomClosed = true;
+  kx = null;
+  log.replaceChildren();
+  kept.clear();
+  $("send").hidden = true;
+  $("close-all").hidden = true;
+  $("copy").hidden = true;
+  setStatus(t("roomClosed"), false);
+  notice(text);
+}
+
 async function start(secret, roomId) {
+  const amnesia = LINK.amnesia;
+  const cryptoRoom = cryptoRoomId(roomId, amnesia);
   const base = await crypto.subtle.importKey("raw", enc.encode(secret), "HKDF", false, ["deriveBits"]);
-  $("safety").textContent = await safetyCode(base, enc.encode("interpartes-chat-v1|" + (roomId || "")));
-  shareLink = `${location.origin}/chat/#${new URLSearchParams({ k: secret })}`;
+  $("safety").textContent = await safetyCode(base, enc.encode("interpartes-chat-v1|" + cryptoRoom));
+  shareLink = `${location.origin}/chat/#${linkParams(secret, amnesia)}`;
   // Keep the key out of the address bar and history; "Copy link" still has it.
   history.replaceState(null, "", "/chat/");
   showScreen("chat");
+  startWatermark();
   notice(t("intro"));
+  if (amnesia) notice(t("amnesiaIntro", { n: AMNESIA_KEEP }));
   kx = IPKX.session({
     secret,
-    roomId,
+    roomId: cryptoRoom,
     scope: "chat",
+    closable: CHAT_ONLY,
     meta: { n: myName, risk: null },
     onStatus,
     onMessage,
+    onClosed(by) {
+      showClosed(by && names.has(by) ? t("closedBy", { n: peerName(by) }) : t("closedAlready"));
+    },
     onPeer(id, meta, isUpdate) {
       const n = cleanName(meta?.n) || t("someone");
       names.set(id, n);
@@ -198,11 +298,15 @@ $("send").addEventListener("submit", async (e) => {
     return;
   }
   input.value = "";
-  addLine("mine", [
-    ["who", myName],
-    ["when", clock(Date.now())],
-    ["text", x],
-  ]);
+  addLine(
+    "mine",
+    [
+      ["who", myName],
+      ["when", clock(Date.now())],
+      ["text", x],
+    ],
+    "me",
+  );
 });
 
 $("text").addEventListener("keydown", (e) => {
@@ -223,6 +327,16 @@ $("leave").addEventListener("click", () => {
   }
 });
 
+$("close-all").addEventListener("click", () => {
+  if (!kx || !confirm(t("closeAllConfirm"))) return;
+  if (!kx.closeForEveryone()) {
+    notice(t("notSent"));
+    return;
+  }
+  closedByUser = true;
+  showClosed(t("closedByYou"));
+});
+
 $("copy").addEventListener("click", async () => {
   await navigator.clipboard.writeText(shareLink);
   $("copy").textContent = t("copied");
@@ -238,7 +352,7 @@ $("join-form").addEventListener("submit", (e) => {
   let { secret, roomId } = LINK;
   if (!secret) {
     secret = randomSecret();
-    history.replaceState(null, "", `#${new URLSearchParams({ k: secret })}`);
+    history.replaceState(null, "", `#${linkParams(secret, LINK.amnesia)}`);
   }
   start(secret, roomId).catch(() => notice(t("startFail")));
 });
@@ -268,9 +382,19 @@ async function callDisplayName() {
   document.documentElement.lang = IPI18N.lang;
   document.title = t("pageTitle");
   IPI18N.apply();
-  $("join-title").textContent = secret ? t("joinChat") : t("startChat");
+  $("join-title").textContent = LINK.amnesia
+    ? secret
+      ? t("joinAmnesia")
+      : t("startAmnesia")
+    : secret
+      ? t("joinChat")
+      : t("startChat");
   $("join-go").textContent = secret ? t("join") : t("start");
   $("copy").hidden = embedded;
+  $("close-all").hidden = !CHAT_ONLY;
+  $("amnesia-tag").hidden = !LINK.amnesia;
+  $("amnesia-hint").hidden = !LINK.amnesia;
+  if (LINK.amnesia) $("amnesia-hint").textContent = t("amnesiaHint", { n: AMNESIA_KEEP });
 
   // Nicknames are never remembered. Two exceptions, both for the current
   // step only: inside a call the chat uses the call's display name, and the
