@@ -186,7 +186,10 @@ async function netcheck(req: Request, info: Deno.ServeHandlerInfo): Promise<Resp
       ["encrypt"],
     );
     // Hints that the request passed through a proxy that announces itself.
-    const proxied = ["via", "forwarded", "x-proxy-id", "x-bluecoat-via", "proxy-connection"].some((h) => req.headers.has(h));
+    // Our own Caddy adds "Via: 1.1 Caddy"; ignore that entry.
+    const via = (req.headers.get("via") || "").split(",").map((s) => s.trim()).filter((s) => s && !/\bcaddy\b/i.test(s));
+    const proxied = via.length > 0 ||
+      ["forwarded", "x-proxy-id", "x-bluecoat-via", "proxy-connection"].some((h) => req.headers.has(h));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const plain = enc.encode(JSON.stringify({ ip: clientIp(req, info), proxied, ts: Date.now() }).padEnd(96));
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain));
