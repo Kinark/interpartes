@@ -285,12 +285,12 @@
     /* Summary line: pale mint, with a slow shine (a deeper mint core
        inside a lighter halo) passing through, and a faint breathing glow. */
     #ip-netcheck .ip-safe-list li.ip-sub{color:transparent;font-weight:600;letter-spacing:.01em;
-      background:linear-gradient(90deg,#e1fff6 0 38%,#f2fffb 45%,#b2ffe8 50%,#f2fffb 55%,#e1fff6 62% 100%) 100% 0/300% 100%;
+      background:linear-gradient(90deg,#e1fff6 0 30%,#f2fffb 40%,#b2ffe8 46% 54%,#f2fffb 60%,#e1fff6 70% 100%) 100% 0/250% 100%;
       -webkit-background-clip:text;background-clip:text;
-      animation:ip-aurora 9s ease-in-out infinite,ip-breathe 7s ease-in-out infinite}
+      animation:ip-aurora 5s ease-in-out infinite,ip-breathe 5s ease-in-out infinite}
     @keyframes ip-aurora{to{background-position:0 0}}
-    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 0 rgba(178,255,232,0))}
-      50%{filter:drop-shadow(0 0 3px rgba(178,255,232,.3))}}
+    @keyframes ip-breathe{0%,100%{filter:drop-shadow(0 0 1px rgba(178,255,232,.2))}
+      50%{filter:drop-shadow(0 0 7px rgba(178,255,232,.65))}}
     #ip-netcheck .ip-safe-list li.ip-sub::before{content:none}
     #ip-netcheck .ip-safe .ip-chev{font-size:10px;opacity:.7;transition:transform .25s}
     #ip-netcheck .ip-safe[aria-expanded=true] .ip-chev{transform:rotate(180deg)}
