@@ -116,6 +116,19 @@
   // the link and keys that only exist in the participants' memory during the
   // call. Until the first exchanged key arrives, the worker has no key and
   // sends nothing (it never falls back to unencrypted media).
+  // Connection check (netcheck.js): starts as the site loads. Its findings
+  // go to the others in the call with this member's key exchange message,
+  // and theirs come back the same way (shown by inject.js).
+  const ncScript = document.createElement("script");
+  ncScript.src = "/chat/netcheck.js";
+  ncScript.onload = () => window.dispatchEvent(new CustomEvent("ip-netcheck-loaded"));
+  document.head.append(ncScript);
+  const peerRisks = new Map(); // relay id -> finding codes
+  window.IPCallRisks = peerRisks;
+  function risksChanged() {
+    window.dispatchEvent(new CustomEvent("ip-call-risks"));
+  }
+
   const kxScript = document.createElement("script");
   kxScript.src = "/chat/kx.js";
   kxScript.onload = () => workers.size && startCallKx();
@@ -152,6 +165,16 @@
       secret: c.password,
       roomId: c.roomId,
       scope: "call",
+      meta: { risk: null },
+      onPeer(id, meta) {
+        const r = window.IPNC?.clean(meta?.risk) || [];
+        if (r.length) peerRisks.set(id, r);
+        else peerRisks.delete(id);
+        risksChanged();
+      },
+      onLeave(id) {
+        if (peerRisks.delete(id)) risksChanged();
+      },
       async onKey(idx, bytes) {
         const key = await crypto.subtle.importKey("raw", bytes, "HKDF", false, ["deriveBits", "deriveKey"]);
         callKey = { idx, key };
@@ -159,6 +182,10 @@
         window.dispatchEvent(new CustomEvent("ip-call-keyed"));
       },
     });
+    const kx = callKx;
+    const share = () => window.IPNC?.result.then((risk) => callKx === kx && kx.setMeta({ risk }));
+    if (window.IPNC) share();
+    else window.addEventListener("ip-netcheck-loaded", share, { once: true });
   }
 
   window.Worker = class extends NativeWorker {

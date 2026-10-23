@@ -74,6 +74,34 @@
         </li>
       </ol>
 
+      <h2 id="connection-check">Connection check</h2>
+      <p>When the site opens, your browser quickly checks the connection you are using. It
+        never stops you, but if it finds a problem, everyone in your call or chat sees a warning
+        for as long as you are there (and you see theirs).</p>
+      <ul>
+        <li>
+          <strong>VPN, Tor, proxy or cloud server.</strong> These do not make a call safer here: the
+          call is already encrypted, and they add another company in the middle that can see who
+          talks to whom, when and how much. The check compares your address with public lists of
+          such services. The lists are downloaded from this site and searched inside your browser, so
+          no outside service is asked about you.
+        </li>
+        <li>
+          <strong>Two different addresses.</strong> If your browser can reveal an address other than
+          the one the site sees, your VPN or proxy leaks, and others in a call may see your real
+          address.
+        </li>
+        <li>
+          <strong>Outside code in the page.</strong> Browser add-ons or other software that inject
+          code into the page could read the call before it is encrypted.
+        </li>
+      </ul>
+      <p>How your address is checked: your browser makes a one-time key and asks the server which
+        address it sees. The server answers encrypted to that key, so the answer can only be read in
+        your browser. The server of course has to receive your address to answer at all, as every
+        server does; it does not log or keep it. Only the kind of problem (for example "VPN") is sent
+        to the others in your room, encrypted with the room's key, never your address.</p>
+
       <h2>Limits</h2>
       <ul>
         <li>

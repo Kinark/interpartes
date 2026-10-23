@@ -111,6 +111,19 @@ function peerName(id) {
   return names.get(id) || "Someone";
 }
 
+// Connection check findings (netcheck.js): yours and everyone else's, shown
+// in a warning that stays at the top of the chat while any exist.
+const risks = new Map();
+let myRisk = [];
+
+function showRisks() {
+  const box = $("risks");
+  const lines = myRisk.map((r) => "You: your device " + IPNC.describe(r));
+  for (const [id, rs] of risks) for (const r of rs) lines.push(`${peerName(id)}: ${IPNC.describe(r)}`);
+  box.hidden = !lines.length;
+  $("risk-list").replaceChildren(...lines.map((l) => Object.assign(document.createElement("li"), { textContent: l })));
+}
+
 function onStatus(s) {
   if (s.full) return setStatus("This chat is full", false);
   if (!s.connected) return setStatus("Disconnected · reconnecting…", false);
@@ -146,18 +159,28 @@ async function start(secret, roomId) {
     secret,
     roomId,
     scope: "chat",
-    meta: { n: myName },
+    meta: { n: myName, risk: null },
     onStatus,
     onMessage,
-    onPeer(id, meta) {
+    onPeer(id, meta, isUpdate) {
       const n = cleanName(meta?.n) || "Someone";
       names.set(id, n);
-      notice(`${n} joined`);
+      if (!isUpdate) notice(`${n} joined`);
+      const r = IPNC.clean(meta?.risk);
+      if (r.length) risks.set(id, r);
+      else risks.delete(id);
+      showRisks();
     },
     onLeave(id) {
       if (!closedByUser && names.has(id)) notice(`${peerName(id)} left`);
       names.delete(id);
+      if (risks.delete(id)) showRisks();
     },
+  });
+  IPNC.result.then((r) => {
+    myRisk = r;
+    kx?.setMeta({ n: myName, risk: r });
+    showRisks();
   });
   $("text").focus();
 }

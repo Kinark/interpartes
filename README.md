@@ -164,6 +164,28 @@ only ever see a random name.
 - Container is read-only, no capabilities, Deno allowed only to listen on
   :8080 and read `/app`.
 
+## Connection check
+`chat/public/netcheck.js` runs as soon as any page loads (from `guard.js` on
+Element Call, directly on `/chat`). It never blocks; findings are shown on the
+home page and, as codes only (never the address), put in each member's sealed
+key exchange message (`meta.risk` in `kx.js`), so everyone else in the call or
+chat sees a warning that stays up while that person is there.
+- **Encrypted address echo**: `POST /chat/netcheck` with a throwaway P-256
+  public key; the server answers the address it sees (Caddy's
+  `X-Forwarded-For`) plus whether proxy headers arrived, AES-GCM encrypted to
+  an ECDH/HKDF key. Nothing is logged or stored. The server still receives the
+  address to reply, like any server.
+- **Lists**: the address is matched in the browser against
+  `chat/public/iplists.txt` (X4BNet VPN + datacenter ranges, Tor exit list),
+  served from this site because the CSP forbids other servers. Refresh with
+  `node chat/update-iplists.mjs`.
+- **WebRTC leak**: public ICE host/srflx addresses that differ from the echoed
+  one (same IP family) mean a leaking VPN or proxy.
+- **Page integrity**: scripts from other origins, extension resources and
+  `navigator.webdriver`.
+- VPN, proxy, Tor and hosting addresses count as a risk, not protection.
+  Failing checks report "could not be checked". All steps time out after 4 s.
+
 ## Updating Element Call
 The CSP allows Element Call's two inline scripts by hash, and
 `config/index.html` is a copy of the release's `index.html`. After changing

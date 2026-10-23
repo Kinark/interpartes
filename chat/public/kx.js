@@ -84,7 +84,7 @@
 
   // opts: secret, roomId, scope ("call" | "chat"), meta (sent to others),
   // onKey(index, bytes) for every new 32-byte key, onMessage(relayId, obj),
-  // onPeer(relayId, meta), onLeave(relayId), onStatus({ connected, n, keyed })
+  // onPeer(relayId, meta, isUpdate), onLeave(relayId), onStatus({ connected, n, keyed })
   function session(opts) {
     const scope = opts.scope;
     const secret = opts.secret;
@@ -233,15 +233,22 @@
 
       if (m.k === "pub" && typeof m.id === "string" && /^[0-9a-f]{32}$/.test(m.id) && typeof m.pub === "string") {
         const old = peers.get(msg.f);
-        if (old?.raw === m.pub) return;
+        if (old?.raw === m.pub) {
+          // Same member, new details (e.g. its connection check finished).
+          if (JSON.stringify(m.meta) !== old.meta) {
+            old.meta = JSON.stringify(m.meta);
+            opts.onPeer?.(msg.f, m.meta, true);
+          }
+          return;
+        }
         let pub;
         try {
           pub = await crypto.subtle.importKey("raw", unb64(m.pub), { name: "ECDH", namedCurve: "P-256" }, false, []);
         } catch {
           return;
         }
-        peers.set(msg.f, { id: m.id, pub, raw: m.pub });
-        if (!old) opts.onPeer?.(msg.f, m.meta);
+        peers.set(msg.f, { id: m.id, pub, raw: m.pub, meta: JSON.stringify(m.meta) });
+        opts.onPeer?.(msg.f, m.meta, !!old);
         for (let i = pendingKeyMsgs.length - 1; i >= 0; i--) {
           if (await onKeyMsg(pendingKeyMsgs[i])) pendingKeyMsgs.splice(i, 1);
         }
@@ -292,8 +299,10 @@
         const c = await seal(groupKeys.get(currentIdx), obj, "msg|" + currentIdx);
         return sendOuter({ k: "msg", i: currentIdx, c });
       },
+      // Updates what the others see; sent again right away.
       setMeta(meta) {
         opts.meta = meta;
+        if (relayN > 0) sendPub().catch(() => {});
       },
       close() {
         closed = true;

@@ -152,6 +152,27 @@ textarea:focus {
   gap: 6px;
 }
 
+#risks {
+  padding: 8px 12px;
+  background: #a3121e;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#risks[hidden] {
+  display: none;
+}
+
+#risks a {
+  color: #fff;
+}
+
+#risks ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
 #log {
   flex: 1;
   overflow-y: auto;

@@ -242,11 +242,121 @@
     go.after(btn);
   }
 
+  // Connection check (netcheck.js, started by guard.js). The home page shows
+  // the result under the buttons; it never stops anyone from continuing, but
+  // says that the others in the room will be told.
+  const NC_STYLE = `
+    #ip-netcheck{grid-column:1/-1;margin:0;padding:10px 12px;border-radius:8px;
+      font:14px/1.4 system-ui,sans-serif;background:rgba(127,127,127,.12)}
+    #ip-netcheck.ok{color:#0dbd8b}
+    #ip-netcheck.bad{background:#a3121e;color:#fff}
+    #ip-netcheck ul{margin:6px 0;padding-left:18px}
+    #ip-netcheck a{color:inherit}
+    #ip-risks{position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:999;
+      max-width:min(560px,calc(100vw - 24px));padding:6px 12px;border-radius:10px;
+      background:#a3121e;color:#fff;font:500 13px/1.4 system-ui,sans-serif}
+    #ip-risks ul{margin:2px 0 0;padding-left:18px}
+    #ip-risks a{color:#fff}
+  `;
+
+  function ncStyle() {
+    if (document.getElementById("ip-nc-style")) return;
+    const style = document.createElement("style");
+    style.id = "ip-nc-style";
+    style.textContent = NC_STYLE;
+    document.head.append(style);
+  }
+
+  function infoLink() {
+    return Object.assign(document.createElement("a"), {
+      href: "/chat/privacy.html#connection-check",
+      target: "_blank",
+      rel: "noopener",
+      textContent: "What this means",
+    });
+  }
+
+  let homeRisk = null; // null until the check has finished
+  function showHomeCheck() {
+    const go = document.querySelector("[data-testid=home_go]");
+    const form = go?.closest("form");
+    if (!form) return;
+    ncStyle();
+    let box = document.getElementById("ip-netcheck");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "ip-netcheck";
+      box.setAttribute("role", "status");
+      form.append(box);
+    }
+    const state = homeRisk === null ? "wait" : homeRisk.length ? "bad" : "ok";
+    if (box.dataset.state === state) return;
+    box.dataset.state = state;
+    box.className = state;
+    if (state === "wait") {
+      box.textContent = "Checking your connection…";
+    } else if (state === "ok") {
+      box.textContent = "✓ Connection check passed";
+    } else {
+      const ul = document.createElement("ul");
+      for (const r of homeRisk) ul.append(Object.assign(document.createElement("li"), { textContent: "Your device " + window.IPNC.describe(r) }));
+      box.replaceChildren(
+        "Your connection may let others listen in:",
+        ul,
+        "You can still continue, but everyone in your call or chat will see this warning. ",
+        infoLink(),
+      );
+    }
+  }
+  function waitForCheck() {
+    window.IPNC?.result.then((r) => {
+      homeRisk = r;
+      showHomeCheck();
+      showCallRisks();
+    });
+  }
+  if (window.IPNC) waitForCheck();
+  else window.addEventListener("ip-netcheck-loaded", waitForCheck, { once: true });
+
+  // In a call: a warning that stays on screen while anyone in the call
+  // (including you) has a finding.
+  function showCallRisks() {
+    let box = document.getElementById("ip-risks");
+    const inCall = location.pathname.startsWith("/room") && document.querySelector("[data-testid=incall_leave]");
+    const lines = [];
+    if (inCall) {
+      for (const r of homeRisk || []) lines.push("You: your device " + window.IPNC.describe(r));
+      for (const risks of window.IPCallRisks?.values() || []) {
+        for (const r of risks) lines.push("Someone in this call " + window.IPNC.describe(r));
+      }
+    }
+    if (!lines.length) {
+      box?.remove();
+      return;
+    }
+    const key = lines.join("\n");
+    if (box?.dataset.key === key) return;
+    ncStyle();
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "ip-risks";
+      box.setAttribute("role", "alert");
+      document.body.append(box);
+    }
+    box.dataset.key = key;
+    const ul = document.createElement("ul");
+    for (const l of lines) ul.append(Object.assign(document.createElement("li"), { textContent: l }));
+    box.replaceChildren("⚠ Connection warning: others may be able to listen in. ", infoLink(), ul);
+  }
+  window.addEventListener("ip-call-risks", showCallRisks);
+
   function sync() {
     if (location.pathname === "/") {
       homeLayout();
       addChatOnlyButton();
+      showHomeCheck();
     }
+    showCallRisks();
     if (!callParams() || !document.querySelector("[data-testid=incall_leave]")) {
       // Left the call (or a different page): drop the chat with it.
       if (frame) closeChat();

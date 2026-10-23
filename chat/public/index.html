@@ -38,6 +38,11 @@
           <button id="leave" type="button">Leave</button>
         </span>
       </header>
+      <div id="risks" role="alert" hidden>
+        ⚠ Connection warning: others may be able to listen in.
+        <a href="/chat/privacy.html#connection-check" target="_blank" rel="noopener">What this means</a>
+        <ul id="risk-list"></ul>
+      </div>
       <ul id="log" aria-live="polite"></ul>
       <form id="send">
         <textarea id="text" rows="1" maxlength="4000" placeholder="Message" autocomplete="off"></textarea>
@@ -45,6 +50,7 @@
       </form>
     </section>
 
+    <script src="/chat/netcheck.js"></script>
     <script src="/chat/kx.js"></script>
     <script src="/chat/app.js"></script>
   </body>
